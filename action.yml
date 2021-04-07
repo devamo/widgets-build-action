@@ -1,0 +1,10 @@
+name: 'Hello World'
+description: 'Greet someone and record the time'
+inputs:
+  github-token:
+    description: 'Github access token'
+    required: true
+    default: ''
+runs:
+  using: 'node12'
+  main: 'index.js'
