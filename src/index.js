@@ -7,7 +7,7 @@ try {
   const githubToken = core.getInput('githubToken')
   console.log(`Github Token: ${githubToken}!`)
 
-  console.log(fs.lstatSync(path.resolve(__dirname)))
+  console.log(fs.readdirSync(path.resolve(__dirname)))
   // const time = new Date().toTimeString()
   // core.setOutput('time', time)
   // const payload = JSON.stringify(github.context.payload, undefined, 2)
