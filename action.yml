@@ -1,10 +1,68 @@
-name: 'Hello World'
-description: 'Greet someone and record the time'
+name: 'Build widget'
 inputs:
-  github-token:
+  githubToken:
     description: 'Github access token'
     required: true
     default: ''
 runs:
-  using: 'node12'
-  main: 'dist/index.js'
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
+      with:
+        node-version: '14.x'
+        registry-url: 'https://registry.npmjs.org'
+
+    # кэшируем node_modules
+    - name: Cache node_modules
+      uses: actions/cache@v2
+      id: npm-cache
+      with:
+        path: '**/node_modules'
+        key: ${{ runner.os }}-node-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    # устанавливаем зависимости
+    - name: Install dependencies
+      if: steps.npm-cache.outputs.cache-hit != 'true'
+      run: npm i
+
+    # собираем бандл
+    - name: Build bundle
+      run: npm run build
+
+    # берем версию из package.json
+    - name: Release version
+      run: |
+        node -p -e '`PRODUCT_VERSION=v${require("./package.json").product.version}`' >> $GITHUB_ENV
+        node -p -e '`PRODUCT_ALIAS=${require("./package.json").product.alias}`' >> $GITHUB_ENV
+
+    # зипуем исходники
+    - name: Zip sources
+      uses: papeloto/action-zip@v1
+      with:
+        files: src/ package.json tsconfig.json vue.config.js yarn.lock
+        recursive: false
+        dest: sources.zip
+
+    # зипуем бандл
+    - name: Zip bundle
+      uses: papeloto/action-zip@v1
+      with:
+        files: build/
+        recursive: true
+        dest: bundle.zip
+
+    # создаем пре-релиз
+    - name: Create release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: 'sources.zip,bundle.zip'
+        tag: ${{ env.PRODUCT_VERSION }}
+        draft: true
+        token: ${{ inputs.githubToken }}
+        replacesArtifacts: true
+        allowUpdates: true
+
+  # main: 'dist/index.js'
