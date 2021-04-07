@@ -6,42 +6,43 @@ inputs:
     default: ''
 runs:
   using: node12
-  steps:
-    # собираем бандл
-    - name: Build bundle
-      run: npm run build
+  main: 'dist/index.js'
+  # steps:
+  # # собираем бандл
+  # - name: Build bundle
+  #   run: npm run build
 
-    # берем версию из package.json
-    - name: Release version
-      run: |
-        node -p -e '`PRODUCT_VERSION=v${require("./package.json").product.version}`' >> $GITHUB_ENV
-        node -p -e '`PRODUCT_ALIAS=${require("./package.json").product.alias}`' >> $GITHUB_ENV
+  # # берем версию из package.json
+  # - name: Release version
+  #   run: |
+  #     node -p -e '`PRODUCT_VERSION=v${require("./package.json").product.version}`' >> $GITHUB_ENV
+  #     node -p -e '`PRODUCT_ALIAS=${require("./package.json").product.alias}`' >> $GITHUB_ENV
 
-    # зипуем исходники
-    - name: Zip sources
-      uses: papeloto/action-zip@v1
-      with:
-        files: src/ package.json tsconfig.json vue.config.js yarn.lock
-        recursive: false
-        dest: sources.zip
+  # # зипуем исходники
+  # - name: Zip sources
+  #   uses: papeloto/action-zip@v1
+  #   with:
+  #     files: src/ package.json tsconfig.json vue.config.js yarn.lock
+  #     recursive: false
+  #     dest: sources.zip
 
-    # зипуем бандл
-    - name: Zip bundle
-      uses: papeloto/action-zip@v1
-      with:
-        files: build/
-        recursive: true
-        dest: bundle.zip
+  # # зипуем бандл
+  # - name: Zip bundle
+  #   uses: papeloto/action-zip@v1
+  #   with:
+  #     files: build/
+  #     recursive: true
+  #     dest: bundle.zip
 
-    # создаем пре-релиз
-    - name: Create release
-      uses: ncipollo/release-action@v1
-      with:
-        artifacts: 'sources.zip,bundle.zip'
-        tag: ${{ env.PRODUCT_VERSION }}
-        draft: true
-        token: ${{ inputs.githubToken }}
-        replacesArtifacts: true
-        allowUpdates: true
+  # # создаем пре-релиз
+  # - name: Create release
+  #   uses: ncipollo/release-action@v1
+  #   with:
+  #     artifacts: 'sources.zip,bundle.zip'
+  #     tag: ${{ env.PRODUCT_VERSION }}
+  #     draft: true
+  #     token: ${{ inputs.githubToken }}
+  #     replacesArtifacts: true
+  #     allowUpdates: true
 
   # main: 'dist/index.js'
