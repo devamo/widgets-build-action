@@ -5754,7 +5754,7 @@ const { cwd } = __webpack_require__(765)
 
 try {
   const githubToken = core.getInput('githubToken')
-  console.log(`Github Token: ${githubToken}!`, github.getOctokit())
+  console.log(`Github Token: ${githubToken}!`)
 
   const dir = path.resolve(cwd())
   const cdir = path.resolve(__dirname)
