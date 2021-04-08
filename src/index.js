@@ -13,8 +13,8 @@ async function run() {
     const productToken = core ? core.getInput('productToken') : ''
     const productVersion = core ? core.getInput('productVersion') : ''
 
-    const sourcesFolder = (core ? core.getInput('sourcesFolder') : '') || repoFolder
-    const bundleFolder = (core ? core.getInput('bundleFolder') : '') || `${sourcesFolder}/build`
+    const sourcesFolder = path.resolve(repoFolder, core ? core.getInput('sourcesFolder') : '')
+    const bundleFolder = path.resolve(repoFolder, core ? core.getInput('bundleFolder') : '/build')
 
     if (!productToken || !productVersion) {
       throw new Error('Product token and product version are required')
