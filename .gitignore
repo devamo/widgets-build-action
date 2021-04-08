@@ -16,6 +16,7 @@ lerna-debug.log*
 # Env
 .env*
 .pkey
+defaults.js
 
 # Tests
 /coverage
