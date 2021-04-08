@@ -31417,15 +31417,15 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
   const sourcesWidgetFolder = pathResolve(sourcesFolder, 'widget')
 
   // архив бандла
-  const distBundleFile = __webpack_require__.ab + "widgets-build-action/" + outputFolder + '/bundle.zip'
+  const distBundleFile = pathResolve(`${outputFolder}/bundle.zip`)
 
   // папка + архив исходников
   const distSourcesFolder = pathResolve(`${outputFolder}/sources`)
-  const distSourcesFile = __webpack_require__.ab + "widgets-build-action/" + outputFolder + '/sources.zip'
+  const distSourcesFile = pathResolve(`${outputFolder}/sources.zip`)
 
   // папка + архив виджета
   const distWidgetFolder = pathResolve(`${outputFolder}/widget`)
-  const distWidgetFile = __webpack_require__.ab + "widgets-build-action/" + outputFolder + '/widget.zip'
+  const distWidgetFile = pathResolve(`${outputFolder}/widget.zip`)
 
   if (!existsSync(sourcesFolder)) throw new Error('Папка с исходниками не найдена', sourcesFolder)
   if (!existsSync(distFolder)) throw new Error('Папка со сборкой не найдена', sourcesFolder)
