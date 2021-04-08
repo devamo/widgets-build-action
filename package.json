@@ -4,6 +4,8 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
+    "start": "node ./dist/index.js",
+    "serve": "node ./src/index.js",
     "build": "ncc build src/index.js -o dist"
   },
   "repository": {
@@ -19,6 +21,11 @@
   "homepage": "https://github.com/devamo/widgets-build-action#readme",
   "dependencies": {
     "@actions/core": "^1.2.6",
-    "@actions/github": "^4.0.0"
+    "@actions/github": "^4.0.0",
+    "axios": "^0.21.1",
+    "fs-extra": "^9.1.0",
+    "rimraf": "^3.0.2",
+    "sharp": "^0.28.1",
+    "zip-dir": "^2.0.0"
   }
 }
