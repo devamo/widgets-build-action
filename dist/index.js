@@ -29969,7 +29969,7 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
 
   // пакуем бандл
   await new Promise((resolve, reject) => {
-    zipDir(`${distFolder}`, { saveTo: bundleFile }, error => {
+    zipDir(`${distFolder}`, { saveTo: distBundleFile }, error => {
       if (error) reject(error)
       else resolve(true)
     })
