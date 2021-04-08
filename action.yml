@@ -1,7 +1,11 @@
 name: 'Build widget'
 inputs:
-  githubToken:
-    description: 'Github access token'
+  productToken:
+    description: 'AmoDEV product token'
+    required: true
+    default: ''
+  productVersion:
+    description: 'AmoDEV product version'
     required: true
     default: ''
 runs:
