@@ -23,6 +23,7 @@ async function run() {
     core.info(`product token: ${productToken}`)
     core.info(`product version: ${productVersion}`)
     core.info(`builder folder: ${builderFolder}`)
+    core.info(`repo folder: ${repoFolder}`)
     core.info(`sources folder: ${sourcesFolder}`)
     core.info(`bundle folder: ${bundleFolder}`)
 
