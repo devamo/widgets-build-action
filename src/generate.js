@@ -20,11 +20,14 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
   // папка с виджетом в исходниках
   const sourcesWidgetFolder = pathResolve(sourcesFolder, 'widget')
 
-  // папка с архивом исходников
+  // архив бандла
+  const distBundleFile = pathResolve(`${outputFolder}/bundle.zip`)
+
+  // папка + архив исходников
   const distSourcesFolder = pathResolve(`${outputFolder}/sources`)
   const distSourcesFile = pathResolve(`${outputFolder}/sources.zip`)
 
-  // папка с архивом виджета
+  // папка + архив виджета
   const distWidgetFolder = pathResolve(`${outputFolder}/widget`)
   const distWidgetFile = pathResolve(`${outputFolder}/widget.zip`)
 
@@ -32,6 +35,7 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
   if (!existsSync(distFolder)) throw new Error('Папка со сборкой не найдена', sourcesFolder)
 
   // удаляем зипы и фолдеры если они есть
+  if (existsSync(distBundleFile)) rimraf.sync(distBundleFile)
   if (existsSync(distSourcesFolder)) rimraf.sync(distSourcesFolder)
   if (existsSync(distSourcesFile)) rimraf.sync(distSourcesFile)
   if (existsSync(distWidgetFolder)) rimraf.sync(distWidgetFolder)
@@ -126,6 +130,15 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
     }
   }
 
+  // пакуем бандл
+  await new Promise((resolve, reject) => {
+    zipDir(`${distFolder}`, { saveTo: bundleFile }, error => {
+      if (error) reject(error)
+      else resolve(true)
+    })
+  })
+  // end bundle
+
   // пакуем сурсы
   await new Promise((resolve, reject) => {
     zipDir(`${distSourcesFolder}`, { saveTo: distSourcesFile }, error => {
@@ -153,7 +166,7 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
   return {
     sources: distSourcesFile,
     widget: distWidgetFile,
-    bundle: distFolder
+    bundle: distBundleFile
   }
 }
 

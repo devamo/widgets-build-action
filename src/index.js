@@ -52,15 +52,15 @@ async function run() {
       } catch (e) {}
     }
 
-    const { widget, sources } = await generate(builderFolder, sourcesFolder, bundleFolder, `${sourcesFolder}/artifacts`, {
+    const { widget, sources, bundle } = await generate(builderFolder, sourcesFolder, bundleFolder, `${sourcesFolder}/artifacts`, {
       ...opts,
       ...amoWidgetOpts
     })
 
     // todo: send bundle, sources and widget to amodev and create github release
-
     core.setOutput('sources', sources)
     core.setOutput('widget', widget)
+    core.setOutput('bundle', bundle)
   } catch (error) {
     console.log(error)
     core.setFailed(error.message)
