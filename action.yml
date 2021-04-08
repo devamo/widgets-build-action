@@ -8,6 +8,14 @@ inputs:
     description: 'AmoDEV product version'
     required: true
     default: ''
+  sourcesFolder:
+    description: 'Sources folder'
+    required: false
+    default: ''
+  bundleFolder:
+    description: 'Bundle folder'
+    required: false
+    default: ''
 runs:
   using: node12
   main: 'dist/index.js'
