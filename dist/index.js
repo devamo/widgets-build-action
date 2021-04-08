@@ -27770,7 +27770,7 @@ async function run() {
     const productVersion = env.productVersion || core.getInput('productVersion') || ''
 
     const sourcesFolder = env.sourcesFolder || path.resolve(repoFolder, core.getInput('sourcesFolder') || '') || ''
-    const bundleFolder = env.bundleFolder || path.resolve(repoFolder, core.getInput('bundleFolder') || '/build') || ''
+    const bundleFolder = env.bundleFolder || path.resolve(repoFolder, core.getInput('bundleFolder') || 'build') || ''
 
     if (!productToken || !productVersion) {
       throw new Error('Product token and product version are required')
