@@ -17,11 +17,11 @@ async function run() {
       env = require(path.resolve(__dirname, '../defaults.js'))
     }
 
-    const productToken = env.productToken || (core ? core.getInput('productToken') : '') || ''
-    const productVersion = env.productVersion || (core ? core.getInput('productVersion') : '') || ''
+    const productToken = env.productToken || core.getInput('productToken') || ''
+    const productVersion = env.productVersion || core.getInput('productVersion') || ''
 
-    const sourcesFolder = env.sourcesFolder || path.resolve(repoFolder, core ? core.getInput('sourcesFolder') : '') || ''
-    const bundleFolder = env.bundleFolder || path.resolve(repoFolder, core ? core.getInput('bundleFolder') : '/build') || ''
+    const sourcesFolder = env.sourcesFolder || path.resolve(repoFolder, core.getInput('sourcesFolder') || '') || ''
+    const bundleFolder = env.bundleFolder || path.resolve(repoFolder, core.getInput('bundleFolder') || '/build') || ''
 
     if (!productToken || !productVersion) {
       throw new Error('Product token and product version are required')
