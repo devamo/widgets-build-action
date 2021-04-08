@@ -26484,14 +26484,14 @@ const { default: axios } = __webpack_require__(366)
 
 async function run() {
   try {
-    const builderFolder = path.resolve(__dirname)
+    const builderFolder = path.resolve(__dirname, '..')
     const repoFolder = path.resolve(cwd())
 
     const productToken = core ? core.getInput('productToken') : ''
     const productVersion = core ? core.getInput('productVersion') : ''
 
-    const sourcesFolder = (core ? core.getInput('sourcesFolder') : '') || repoFolder
-    const bundleFolder = (core ? core.getInput('bundleFolder') : '') || `${sourcesFolder}/build`
+    const sourcesFolder = path.resolve(repoFolder, core ? core.getInput('sourcesFolder') : '')
+    const bundleFolder = path.resolve(repoFolder, core ? core.getInput('bundleFolder') : '/build')
 
     if (!productToken || !productVersion) {
       throw new Error('Product token and product version are required')
@@ -26500,6 +26500,7 @@ async function run() {
     core.info(`product token: ${productToken}`)
     core.info(`product version: ${productVersion}`)
     core.info(`builder folder: ${builderFolder}`)
+    core.info(`repo folder: ${repoFolder}`)
     core.info(`sources folder: ${sourcesFolder}`)
     core.info(`bundle folder: ${bundleFolder}`)
 

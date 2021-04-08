@@ -7,7 +7,7 @@ const { default: axios } = require('axios')
 
 async function run() {
   try {
-    const builderFolder = path.resolve(__dirname)
+    const builderFolder = path.resolve(__dirname, '..')
     const repoFolder = path.resolve(cwd())
 
     const productToken = core ? core.getInput('productToken') : ''
