@@ -41,19 +41,9 @@ module.exports =
 /******/ 	return startup();
 /******/ })
 /************************************************************************/
-/******/ ([
-/* 0 */,
-/* 1 */,
-/* 2 */,
-/* 3 */,
-/* 4 */
-/***/ (function(module) {
+/******/ ({
 
-module.exports = require("child_process");
-
-/***/ }),
-/* 5 */,
-/* 6 */
+/***/ 6:
 /***/ (function(__unusedmodule, exports) {
 
 (function (global, factory) {
@@ -4904,22 +4894,8 @@ module.exports = require("child_process");
 
 
 /***/ }),
-/* 7 */,
-/* 8 */,
-/* 9 */,
-/* 10 */,
-/* 11 */,
-/* 12 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const compare = __webpack_require__(233)
-const eq = (a, b, loose) => compare(a, b, loose) === 0
-module.exports = eq
-
-
-/***/ }),
-/* 13 */,
-/* 14 */
+/***/ 14:
 /***/ (function(__unusedmodule, exports) {
 
 "use strict";
@@ -4944,7 +4920,8 @@ exports.toCommandValue = toCommandValue;
 //# sourceMappingURL=utils.js.map
 
 /***/ }),
-/* 15 */
+
+/***/ 15:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var wrappy = __webpack_require__(818)
@@ -5004,11 +4981,8 @@ function slice (args) {
 
 
 /***/ }),
-/* 16 */,
-/* 17 */,
-/* 18 */,
-/* 19 */,
-/* 20 */
+
+/***/ 20:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -5089,1037 +5063,310 @@ module.exports = NodejsStreamInputAdapter;
 
 
 /***/ }),
-/* 21 */
+
+/***/ 21:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
+var readerFor = __webpack_require__(298);
+var utils = __webpack_require__(901);
+var CompressedObject = __webpack_require__(454);
+var crc32fn = __webpack_require__(734);
+var utf8 = __webpack_require__(341);
+var compressions = __webpack_require__(703);
+var support = __webpack_require__(546);
 
-const is = __webpack_require__(64);
-const sharp = __webpack_require__(525);
-
-const formats = new Map([
-  ['heic', 'heif'],
-  ['heif', 'heif'],
-  ['avif', 'avif'],
-  ['jpeg', 'jpeg'],
-  ['jpg', 'jpeg'],
-  ['png', 'png'],
-  ['raw', 'raw'],
-  ['tiff', 'tiff'],
-  ['webp', 'webp'],
-  ['gif', 'gif']
-]);
-
-const errMagickSave = new Error('GIF output requires libvips with support for ImageMagick');
+var MADE_BY_DOS = 0x00;
+var MADE_BY_UNIX = 0x03;
 
 /**
- * Write output image data to a file.
- *
- * If an explicit output format is not selected, it will be inferred from the extension,
- * with JPEG, PNG, WebP, AVIF, TIFF, DZI, and libvips' V format supported.
- * Note that raw pixel data is only supported for buffer output.
- *
- * By default all metadata will be removed, which includes EXIF-based orientation.
- * See {@link withMetadata} for control over this.
- *
- * A `Promise` is returned when `callback` is not provided.
- *
- * @example
- * sharp(input)
- *   .toFile('output.png', (err, info) => { ... });
- *
- * @example
- * sharp(input)
- *   .toFile('output.png')
- *   .then(info => { ... })
- *   .catch(err => { ... });
- *
- * @param {string} fileOut - the path to write the image data to.
- * @param {Function} [callback] - called on completion with two arguments `(err, info)`.
- * `info` contains the output image `format`, `size` (bytes), `width`, `height`,
- * `channels` and `premultiplied` (indicating if premultiplication was used).
- * When using a crop strategy also contains `cropOffsetLeft` and `cropOffsetTop`.
- * @returns {Promise<Object>} - when no callback is provided
- * @throws {Error} Invalid parameters
+ * Find a compression registered in JSZip.
+ * @param {string} compressionMethod the method magic to find.
+ * @return {Object|null} the JSZip compression object, null if none found.
  */
-function toFile (fileOut, callback) {
-  let err;
-  if (!is.string(fileOut)) {
-    err = new Error('Missing output file path');
-  } else if (this.options.input.file === fileOut) {
-    err = new Error('Cannot use same file for input and output');
-  } else if (this.options.formatOut === 'input' && fileOut.toLowerCase().endsWith('.gif') && !this.constructor.format.magick.output.file) {
-    err = errMagickSave;
-  }
-  if (err) {
-    if (is.fn(callback)) {
-      callback(err);
-    } else {
-      return Promise.reject(err);
-    }
-  } else {
-    this.options.fileOut = fileOut;
-    return this._pipeline(callback);
-  }
-  return this;
-}
-
-/**
- * Write output to a Buffer.
- * JPEG, PNG, WebP, AVIF, TIFF and raw pixel data output are supported.
- *
- * If no explicit format is set, the output format will match the input image, except GIF and SVG input which become PNG output.
- *
- * By default all metadata will be removed, which includes EXIF-based orientation.
- * See {@link withMetadata} for control over this.
- *
- * `callback`, if present, gets three arguments `(err, data, info)` where:
- * - `err` is an error, if any.
- * - `data` is the output image data.
- * - `info` contains the output image `format`, `size` (bytes), `width`, `height`,
- * `channels` and `premultiplied` (indicating if premultiplication was used).
- * When using a crop strategy also contains `cropOffsetLeft` and `cropOffsetTop`.
- *
- * A `Promise` is returned when `callback` is not provided.
- *
- * @example
- * sharp(input)
- *   .toBuffer((err, data, info) => { ... });
- *
- * @example
- * sharp(input)
- *   .toBuffer()
- *   .then(data => { ... })
- *   .catch(err => { ... });
- *
- * @example
- * sharp(input)
- *   .toBuffer({ resolveWithObject: true })
- *   .then(({ data, info }) => { ... })
- *   .catch(err => { ... });
- *
- * @example
- * const { data, info } = await sharp('my-image.jpg')
- *   // output the raw pixels
- *   .raw()
- *   .toBuffer({ resolveWithObject: true });
- *
- * // create a more type safe way to work with the raw pixel data
- * // this will not copy the data, instead it will change `data`s underlying ArrayBuffer
- * // so `data` and `pixelArray` point to the same memory location
- * const pixelArray = new Uint8ClampedArray(data.buffer);
- *
- * // When you are done changing the pixelArray, sharp takes the `pixelArray` as an input
- * const { width, height, channels } = info;
- * await sharp(pixelArray, { raw: { width, height, channels } })
- *   .toFile('my-changed-image.jpg');
- *
- * @param {Object} [options]
- * @param {boolean} [options.resolveWithObject] Resolve the Promise with an Object containing `data` and `info` properties instead of resolving only with `data`.
- * @param {Function} [callback]
- * @returns {Promise<Buffer>} - when no callback is provided
- */
-function toBuffer (options, callback) {
-  if (is.object(options)) {
-    this._setBooleanOption('resolveWithObject', options.resolveWithObject);
-  } else if (this.options.resolveWithObject) {
-    this.options.resolveWithObject = false;
-  }
-  return this._pipeline(is.fn(options) ? options : callback);
-}
-
-/**
- * Include all metadata (EXIF, XMP, IPTC) from the input image in the output image.
- * This will also convert to and add a web-friendly sRGB ICC profile unless a custom
- * output profile is provided.
- *
- * The default behaviour, when `withMetadata` is not used, is to convert to the device-independent
- * sRGB colour space and strip all metadata, including the removal of any ICC profile.
- *
- * @example
- * sharp('input.jpg')
- *   .withMetadata()
- *   .toFile('output-with-metadata.jpg')
- *   .then(info => { ... });
- *
- * @example
- * // Set "IFD0-Copyright" in output EXIF metadata
- * await sharp(input)
- *   .withMetadata({
- *     exif: {
- *       IFD0: {
- *         Copyright: 'Wernham Hogg'
- *       }
- *     }
- *   })
- *   .toBuffer();
- *
- * @param {Object} [options]
- * @param {number} [options.orientation] value between 1 and 8, used to update the EXIF `Orientation` tag.
- * @param {string} [options.icc] filesystem path to output ICC profile, defaults to sRGB.
- * @param {Object<Object>} [options.exif={}] Object keyed by IFD0, IFD1 etc. of key/value string pairs to write as EXIF data.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function withMetadata (options) {
-  this.options.withMetadata = is.bool(options) ? options : true;
-  if (is.object(options)) {
-    if (is.defined(options.orientation)) {
-      if (is.integer(options.orientation) && is.inRange(options.orientation, 1, 8)) {
-        this.options.withMetadataOrientation = options.orientation;
-      } else {
-        throw is.invalidParameterError('orientation', 'integer between 1 and 8', options.orientation);
-      }
-    }
-    if (is.defined(options.icc)) {
-      if (is.string(options.icc)) {
-        this.options.withMetadataIcc = options.icc;
-      } else {
-        throw is.invalidParameterError('icc', 'string filesystem path to ICC profile', options.icc);
-      }
-    }
-    if (is.defined(options.exif)) {
-      if (is.object(options.exif)) {
-        for (const [ifd, entries] of Object.entries(options.exif)) {
-          if (is.object(entries)) {
-            for (const [k, v] of Object.entries(entries)) {
-              if (is.string(v)) {
-                this.options.withMetadataStrs[`exif-${ifd.toLowerCase()}-${k}`] = v;
-              } else {
-                throw is.invalidParameterError(`exif.${ifd}.${k}`, 'string', v);
-              }
-            }
-          } else {
-            throw is.invalidParameterError(`exif.${ifd}`, 'object', entries);
-          }
+var findCompression = function(compressionMethod) {
+    for (var method in compressions) {
+        if (!compressions.hasOwnProperty(method)) {
+            continue;
         }
-      } else {
-        throw is.invalidParameterError('exif', 'object', options.exif);
-      }
-    }
-  }
-  return this;
-}
-
-/**
- * Force output to a given format.
- *
- * @example
- * // Convert any input to PNG output
- * const data = await sharp(input)
- *   .toFormat('png')
- *   .toBuffer();
- *
- * @param {(string|Object)} format - as a string or an Object with an 'id' attribute
- * @param {Object} options - output options
- * @returns {Sharp}
- * @throws {Error} unsupported format or options
- */
-function toFormat (format, options) {
-  const actualFormat = formats.get((is.object(format) && is.string(format.id) ? format.id : format).toLowerCase());
-  if (!actualFormat) {
-    throw is.invalidParameterError('format', `one of: ${[...formats.keys()].join(', ')}`, format);
-  }
-  return this[actualFormat](options);
-}
-
-/**
- * Use these JPEG options for output image.
- *
- * @example
- * // Convert any input to very high quality JPEG output
- * const data = await sharp(input)
- *   .jpeg({
- *     quality: 100,
- *     chromaSubsampling: '4:4:4'
- *   })
- *   .toBuffer();
- *
- * @example
- * // Use mozjpeg to reduce output JPEG file size (slower)
- * const data = await sharp(input)
- *   .jpeg({ mozjpeg: true })
- *   .toBuffer();
- *
- * @param {Object} [options] - output options
- * @param {number} [options.quality=80] - quality, integer 1-100
- * @param {boolean} [options.progressive=false] - use progressive (interlace) scan
- * @param {string} [options.chromaSubsampling='4:2:0'] - set to '4:4:4' to prevent chroma subsampling otherwise defaults to '4:2:0' chroma subsampling
- * @param {boolean} [options.optimiseCoding=true] - optimise Huffman coding tables
- * @param {boolean} [options.optimizeCoding=true] - alternative spelling of optimiseCoding
- * @param {boolean} [options.mozjpeg=false] - use mozjpeg defaults, equivalent to `{ trellisQuantisation: true, overshootDeringing: true, optimiseScans: true, quantisationTable: 3 }`
- * @param {boolean} [options.trellisQuantisation=false] - apply trellis quantisation
- * @param {boolean} [options.overshootDeringing=false] - apply overshoot deringing
- * @param {boolean} [options.optimiseScans=false] - optimise progressive scans, forces progressive
- * @param {boolean} [options.optimizeScans=false] - alternative spelling of optimiseScans
- * @param {number} [options.quantisationTable=0] - quantization table to use, integer 0-8
- * @param {number} [options.quantizationTable=0] - alternative spelling of quantisationTable
- * @param {boolean} [options.force=true] - force JPEG output, otherwise attempt to use input format
- * @returns {Sharp}
- * @throws {Error} Invalid options
- */
-function jpeg (options) {
-  if (is.object(options)) {
-    if (is.defined(options.quality)) {
-      if (is.integer(options.quality) && is.inRange(options.quality, 1, 100)) {
-        this.options.jpegQuality = options.quality;
-      } else {
-        throw is.invalidParameterError('quality', 'integer between 1 and 100', options.quality);
-      }
-    }
-    if (is.defined(options.progressive)) {
-      this._setBooleanOption('jpegProgressive', options.progressive);
-    }
-    if (is.defined(options.chromaSubsampling)) {
-      if (is.string(options.chromaSubsampling) && is.inArray(options.chromaSubsampling, ['4:2:0', '4:4:4'])) {
-        this.options.jpegChromaSubsampling = options.chromaSubsampling;
-      } else {
-        throw is.invalidParameterError('chromaSubsampling', 'one of: 4:2:0, 4:4:4', options.chromaSubsampling);
-      }
-    }
-    const optimiseCoding = is.bool(options.optimizeCoding) ? options.optimizeCoding : options.optimiseCoding;
-    if (is.defined(optimiseCoding)) {
-      this._setBooleanOption('jpegOptimiseCoding', optimiseCoding);
-    }
-    if (is.defined(options.mozjpeg)) {
-      if (is.bool(options.mozjpeg)) {
-        if (options.mozjpeg) {
-          this.options.jpegTrellisQuantisation = true;
-          this.options.jpegOvershootDeringing = true;
-          this.options.jpegOptimiseScans = true;
-          this.options.jpegProgressive = true;
-          this.options.jpegQuantisationTable = 3;
+        if (compressions[method].magic === compressionMethod) {
+            return compressions[method];
         }
-      } else {
-        throw is.invalidParameterError('mozjpeg', 'boolean', options.mozjpeg);
-      }
     }
-    const trellisQuantisation = is.bool(options.trellisQuantization) ? options.trellisQuantization : options.trellisQuantisation;
-    if (is.defined(trellisQuantisation)) {
-      this._setBooleanOption('jpegTrellisQuantisation', trellisQuantisation);
-    }
-    if (is.defined(options.overshootDeringing)) {
-      this._setBooleanOption('jpegOvershootDeringing', options.overshootDeringing);
-    }
-    const optimiseScans = is.bool(options.optimizeScans) ? options.optimizeScans : options.optimiseScans;
-    if (is.defined(optimiseScans)) {
-      this._setBooleanOption('jpegOptimiseScans', optimiseScans);
-      if (optimiseScans) {
-        this.options.jpegProgressive = true;
-      }
-    }
-    const quantisationTable = is.number(options.quantizationTable) ? options.quantizationTable : options.quantisationTable;
-    if (is.defined(quantisationTable)) {
-      if (is.integer(quantisationTable) && is.inRange(quantisationTable, 0, 8)) {
-        this.options.jpegQuantisationTable = quantisationTable;
-      } else {
-        throw is.invalidParameterError('quantisationTable', 'integer between 0 and 8', quantisationTable);
-      }
-    }
-  }
-  return this._updateFormatOut('jpeg', options);
-}
-
-/**
- * Use these PNG options for output image.
- *
- * By default, PNG output is full colour at 8 or 16 bits per pixel.
- * Indexed PNG input at 1, 2 or 4 bits per pixel is converted to 8 bits per pixel.
- * Set `palette` to `true` for slower, indexed PNG output.
- *
- * @example
- * // Convert any input to full colour PNG output
- * const data = await sharp(input)
- *   .png()
- *   .toBuffer();
- *
- * @example
- * // Convert any input to indexed PNG output (slower)
- * const data = await sharp(input)
- *   .png({ palette: true })
- *   .toBuffer();
- *
- * @param {Object} [options]
- * @param {boolean} [options.progressive=false] - use progressive (interlace) scan
- * @param {number} [options.compressionLevel=6] - zlib compression level, 0 (fastest, largest) to 9 (slowest, smallest)
- * @param {boolean} [options.adaptiveFiltering=false] - use adaptive row filtering
- * @param {boolean} [options.palette=false] - quantise to a palette-based image with alpha transparency support
- * @param {number} [options.quality=100] - use the lowest number of colours needed to achieve given quality, sets `palette` to `true`
- * @param {number} [options.colours=256] - maximum number of palette entries, sets `palette` to `true`
- * @param {number} [options.colors=256] - alternative spelling of `options.colours`, sets `palette` to `true`
- * @param {number} [options.dither=1.0] - level of Floyd-Steinberg error diffusion, sets `palette` to `true`
- * @param {boolean} [options.force=true] - force PNG output, otherwise attempt to use input format
- * @returns {Sharp}
- * @throws {Error} Invalid options
- */
-function png (options) {
-  if (is.object(options)) {
-    if (is.defined(options.progressive)) {
-      this._setBooleanOption('pngProgressive', options.progressive);
-    }
-    if (is.defined(options.compressionLevel)) {
-      if (is.integer(options.compressionLevel) && is.inRange(options.compressionLevel, 0, 9)) {
-        this.options.pngCompressionLevel = options.compressionLevel;
-      } else {
-        throw is.invalidParameterError('compressionLevel', 'integer between 0 and 9', options.compressionLevel);
-      }
-    }
-    if (is.defined(options.adaptiveFiltering)) {
-      this._setBooleanOption('pngAdaptiveFiltering', options.adaptiveFiltering);
-    }
-    if (is.defined(options.palette)) {
-      this._setBooleanOption('pngPalette', options.palette);
-    } else if (is.defined(options.quality) || is.defined(options.colours || options.colors) || is.defined(options.dither)) {
-      this._setBooleanOption('pngPalette', true);
-    }
-    if (this.options.pngPalette) {
-      if (is.defined(options.quality)) {
-        if (is.integer(options.quality) && is.inRange(options.quality, 0, 100)) {
-          this.options.pngQuality = options.quality;
-        } else {
-          throw is.invalidParameterError('quality', 'integer between 0 and 100', options.quality);
-        }
-      }
-      const colours = options.colours || options.colors;
-      if (is.defined(colours)) {
-        if (is.integer(colours) && is.inRange(colours, 2, 256)) {
-          this.options.pngColours = colours;
-        } else {
-          throw is.invalidParameterError('colours', 'integer between 2 and 256', colours);
-        }
-      }
-      if (is.defined(options.dither)) {
-        if (is.number(options.dither) && is.inRange(options.dither, 0, 1)) {
-          this.options.pngDither = options.dither;
-        } else {
-          throw is.invalidParameterError('dither', 'number between 0.0 and 1.0', options.dither);
-        }
-      }
-    }
-  }
-  return this._updateFormatOut('png', options);
-}
-
-/**
- * Use these WebP options for output image.
- *
- * @example
- * // Convert any input to lossless WebP output
- * const data = await sharp(input)
- *   .webp({ lossless: true })
- *   .toBuffer();
- *
- * @example
- * // Optimise the file size of an animated WebP
- * const outputWebp = await sharp(inputWebp, { animated: true })
- *   .webp({ reductionEffort: 6 })
- *   .toBuffer();
- *
- * @param {Object} [options] - output options
- * @param {number} [options.quality=80] - quality, integer 1-100
- * @param {number} [options.alphaQuality=100] - quality of alpha layer, integer 0-100
- * @param {boolean} [options.lossless=false] - use lossless compression mode
- * @param {boolean} [options.nearLossless=false] - use near_lossless compression mode
- * @param {boolean} [options.smartSubsample=false] - use high quality chroma subsampling
- * @param {number} [options.reductionEffort=4] - level of CPU effort to reduce file size, integer 0-6
- * @param {number} [options.pageHeight] - page height for animated output
- * @param {number} [options.loop=0] - number of animation iterations, use 0 for infinite animation
- * @param {number[]} [options.delay] - list of delays between animation frames (in milliseconds)
- * @param {boolean} [options.force=true] - force WebP output, otherwise attempt to use input format
- * @returns {Sharp}
- * @throws {Error} Invalid options
- */
-function webp (options) {
-  if (is.object(options) && is.defined(options.quality)) {
-    if (is.integer(options.quality) && is.inRange(options.quality, 1, 100)) {
-      this.options.webpQuality = options.quality;
-    } else {
-      throw is.invalidParameterError('quality', 'integer between 1 and 100', options.quality);
-    }
-  }
-  if (is.object(options) && is.defined(options.alphaQuality)) {
-    if (is.integer(options.alphaQuality) && is.inRange(options.alphaQuality, 0, 100)) {
-      this.options.webpAlphaQuality = options.alphaQuality;
-    } else {
-      throw is.invalidParameterError('alphaQuality', 'integer between 0 and 100', options.alphaQuality);
-    }
-  }
-  if (is.object(options) && is.defined(options.lossless)) {
-    this._setBooleanOption('webpLossless', options.lossless);
-  }
-  if (is.object(options) && is.defined(options.nearLossless)) {
-    this._setBooleanOption('webpNearLossless', options.nearLossless);
-  }
-  if (is.object(options) && is.defined(options.smartSubsample)) {
-    this._setBooleanOption('webpSmartSubsample', options.smartSubsample);
-  }
-  if (is.object(options) && is.defined(options.reductionEffort)) {
-    if (is.integer(options.reductionEffort) && is.inRange(options.reductionEffort, 0, 6)) {
-      this.options.webpReductionEffort = options.reductionEffort;
-    } else {
-      throw is.invalidParameterError('reductionEffort', 'integer between 0 and 6', options.reductionEffort);
-    }
-  }
-
-  trySetAnimationOptions(options, this.options);
-  return this._updateFormatOut('webp', options);
-}
-
-/**
- * Use these GIF options for output image.
- *
- * Requires libvips compiled with support for ImageMagick or GraphicsMagick.
- * The prebuilt binaries do not include this - see
- * {@link https://sharp.pixelplumbing.com/install#custom-libvips installing a custom libvips}.
- *
- * @param {Object} [options] - output options
- * @param {number} [options.pageHeight] - page height for animated output
- * @param {number} [options.loop=0] - number of animation iterations, use 0 for infinite animation
- * @param {number[]} [options.delay] - list of delays between animation frames (in milliseconds)
- * @param {boolean} [options.force=true] - force GIF output, otherwise attempt to use input format
- * @returns {Sharp}
- * @throws {Error} Invalid options
- */
-/* istanbul ignore next */
-function gif (options) {
-  if (!this.constructor.format.magick.output.buffer) {
-    throw errMagickSave;
-  }
-  trySetAnimationOptions(options, this.options);
-  return this._updateFormatOut('gif', options);
-}
-
-/**
- * Set animation options if available.
- * @private
- *
- * @param {Object} [source] - output options
- * @param {number} [source.pageHeight] - page height for animated output
- * @param {number} [source.loop=0] - number of animation iterations, use 0 for infinite animation
- * @param {number[]} [source.delay] - list of delays between animation frames (in milliseconds)
- * @param {Object} [target] - target object for valid options
- * @throws {Error} Invalid options
- */
-function trySetAnimationOptions (source, target) {
-  if (is.object(source) && is.defined(source.pageHeight)) {
-    if (is.integer(source.pageHeight) && source.pageHeight > 0) {
-      target.pageHeight = source.pageHeight;
-    } else {
-      throw is.invalidParameterError('pageHeight', 'integer larger than 0', source.pageHeight);
-    }
-  }
-  if (is.object(source) && is.defined(source.loop)) {
-    if (is.integer(source.loop) && is.inRange(source.loop, 0, 65535)) {
-      target.loop = source.loop;
-    } else {
-      throw is.invalidParameterError('loop', 'integer between 0 and 65535', source.loop);
-    }
-  }
-  if (is.object(source) && is.defined(source.delay)) {
-    if (
-      Array.isArray(source.delay) &&
-      source.delay.every(is.integer) &&
-      source.delay.every(v => is.inRange(v, 0, 65535))) {
-      target.delay = source.delay;
-    } else {
-      throw is.invalidParameterError('delay', 'array of integers between 0 and 65535', source.delay);
-    }
-  }
-}
-
-/**
- * Use these TIFF options for output image.
- *
- * @example
- * // Convert SVG input to LZW-compressed, 1 bit per pixel TIFF output
- * sharp('input.svg')
- *   .tiff({
- *     compression: 'lzw',
- *     bitdepth: 1
- *   })
- *   .toFile('1-bpp-output.tiff')
- *   .then(info => { ... });
- *
- * @param {Object} [options] - output options
- * @param {number} [options.quality=80] - quality, integer 1-100
- * @param {boolean} [options.force=true] - force TIFF output, otherwise attempt to use input format
- * @param {string} [options.compression='jpeg'] - compression options: lzw, deflate, jpeg, ccittfax4
- * @param {string} [options.predictor='horizontal'] - compression predictor options: none, horizontal, float
- * @param {boolean} [options.pyramid=false] - write an image pyramid
- * @param {boolean} [options.tile=false] - write a tiled tiff
- * @param {number} [options.tileWidth=256] - horizontal tile size
- * @param {number} [options.tileHeight=256] - vertical tile size
- * @param {number} [options.xres=1.0] - horizontal resolution in pixels/mm
- * @param {number} [options.yres=1.0] - vertical resolution in pixels/mm
- * @param {number} [options.bitdepth=8] - reduce bitdepth to 1, 2 or 4 bit
- * @returns {Sharp}
- * @throws {Error} Invalid options
- */
-function tiff (options) {
-  if (is.object(options)) {
-    if (is.defined(options.quality)) {
-      if (is.integer(options.quality) && is.inRange(options.quality, 1, 100)) {
-        this.options.tiffQuality = options.quality;
-      } else {
-        throw is.invalidParameterError('quality', 'integer between 1 and 100', options.quality);
-      }
-    }
-    if (is.defined(options.bitdepth)) {
-      if (is.integer(options.bitdepth) && is.inArray(options.bitdepth, [1, 2, 4, 8])) {
-        this.options.tiffBitdepth = options.bitdepth;
-      } else {
-        throw is.invalidParameterError('bitdepth', '1, 2, 4 or 8', options.bitdepth);
-      }
-    }
-    // tiling
-    if (is.defined(options.tile)) {
-      this._setBooleanOption('tiffTile', options.tile);
-    }
-    if (is.defined(options.tileWidth)) {
-      if (is.integer(options.tileWidth) && options.tileWidth > 0) {
-        this.options.tiffTileWidth = options.tileWidth;
-      } else {
-        throw is.invalidParameterError('tileWidth', 'integer greater than zero', options.tileWidth);
-      }
-    }
-    if (is.defined(options.tileHeight)) {
-      if (is.integer(options.tileHeight) && options.tileHeight > 0) {
-        this.options.tiffTileHeight = options.tileHeight;
-      } else {
-        throw is.invalidParameterError('tileHeight', 'integer greater than zero', options.tileHeight);
-      }
-    }
-    // pyramid
-    if (is.defined(options.pyramid)) {
-      this._setBooleanOption('tiffPyramid', options.pyramid);
-    }
-    // resolution
-    if (is.defined(options.xres)) {
-      if (is.number(options.xres) && options.xres > 0) {
-        this.options.tiffXres = options.xres;
-      } else {
-        throw is.invalidParameterError('xres', 'number greater than zero', options.xres);
-      }
-    }
-    if (is.defined(options.yres)) {
-      if (is.number(options.yres) && options.yres > 0) {
-        this.options.tiffYres = options.yres;
-      } else {
-        throw is.invalidParameterError('yres', 'number greater than zero', options.yres);
-      }
-    }
-    // compression
-    if (is.defined(options.compression)) {
-      if (is.string(options.compression) && is.inArray(options.compression, ['lzw', 'deflate', 'jpeg', 'ccittfax4', 'none'])) {
-        this.options.tiffCompression = options.compression;
-      } else {
-        throw is.invalidParameterError('compression', 'one of: lzw, deflate, jpeg, ccittfax4, none', options.compression);
-      }
-    }
-    // predictor
-    if (is.defined(options.predictor)) {
-      if (is.string(options.predictor) && is.inArray(options.predictor, ['none', 'horizontal', 'float'])) {
-        this.options.tiffPredictor = options.predictor;
-      } else {
-        throw is.invalidParameterError('predictor', 'one of: none, horizontal, float', options.predictor);
-      }
-    }
-  }
-  return this._updateFormatOut('tiff', options);
-}
-
-/**
- * Use these AVIF options for output image.
- *
- * Whilst it is possible to create AVIF images smaller than 16x16 pixels,
- * most web browsers do not display these properly.
- *
- * @since 0.27.0
- *
- * @param {Object} [options] - output options
- * @param {number} [options.quality=50] - quality, integer 1-100
- * @param {boolean} [options.lossless=false] - use lossless compression
- * @param {number} [options.speed=5] - CPU effort vs file size, 0 (slowest/smallest) to 8 (fastest/largest)
- * @param {string} [options.chromaSubsampling='4:2:0'] - set to '4:4:4' to prevent chroma subsampling otherwise defaults to '4:2:0' chroma subsampling, requires libvips v8.11.0
- * @returns {Sharp}
- * @throws {Error} Invalid options
- */
-function avif (options) {
-  return this.heif({ ...options, compression: 'av1' });
-}
-
-/**
- * Use these HEIF options for output image.
- *
- * Support for patent-encumbered HEIC images requires the use of a
- * globally-installed libvips compiled with support for libheif, libde265 and x265.
- *
- * @since 0.23.0
- *
- * @param {Object} [options] - output options
- * @param {number} [options.quality=50] - quality, integer 1-100
- * @param {string} [options.compression='av1'] - compression format: av1, hevc
- * @param {boolean} [options.lossless=false] - use lossless compression
- * @param {number} [options.speed=5] - CPU effort vs file size, 0 (slowest/smallest) to 8 (fastest/largest)
- * @param {string} [options.chromaSubsampling='4:2:0'] - set to '4:4:4' to prevent chroma subsampling otherwise defaults to '4:2:0' chroma subsampling, requires libvips v8.11.0
- * @returns {Sharp}
- * @throws {Error} Invalid options
- */
-function heif (options) {
-  if (is.object(options)) {
-    if (is.defined(options.quality)) {
-      if (is.integer(options.quality) && is.inRange(options.quality, 1, 100)) {
-        this.options.heifQuality = options.quality;
-      } else {
-        throw is.invalidParameterError('quality', 'integer between 1 and 100', options.quality);
-      }
-    }
-    if (is.defined(options.lossless)) {
-      if (is.bool(options.lossless)) {
-        this.options.heifLossless = options.lossless;
-      } else {
-        throw is.invalidParameterError('lossless', 'boolean', options.lossless);
-      }
-    }
-    if (is.defined(options.compression)) {
-      if (is.string(options.compression) && is.inArray(options.compression, ['av1', 'hevc'])) {
-        this.options.heifCompression = options.compression;
-      } else {
-        throw is.invalidParameterError('compression', 'one of: av1, hevc', options.compression);
-      }
-    }
-    if (is.defined(options.speed)) {
-      if (is.integer(options.speed) && is.inRange(options.speed, 0, 8)) {
-        this.options.heifSpeed = options.speed;
-      } else {
-        throw is.invalidParameterError('speed', 'integer between 0 and 8', options.speed);
-      }
-    }
-    if (is.defined(options.chromaSubsampling)) {
-      if (is.string(options.chromaSubsampling) && is.inArray(options.chromaSubsampling, ['4:2:0', '4:4:4'])) {
-        this.options.heifChromaSubsampling = options.chromaSubsampling;
-      } else {
-        throw is.invalidParameterError('chromaSubsampling', 'one of: 4:2:0, 4:4:4', options.chromaSubsampling);
-      }
-    }
-  }
-  return this._updateFormatOut('heif', options);
-}
-
-/**
- * Force output to be raw, uncompressed, 8-bit unsigned integer (unit8) pixel data.
- * Pixel ordering is left-to-right, top-to-bottom, without padding.
- * Channel ordering will be RGB or RGBA for non-greyscale colourspaces.
- *
- * @example
- * // Extract raw RGB pixel data from JPEG input
- * const { data, info } = await sharp('input.jpg')
- *   .raw()
- *   .toBuffer({ resolveWithObject: true });
- *
- * @example
- * // Extract alpha channel as raw pixel data from PNG input
- * const data = await sharp('input.png')
- *   .ensureAlpha()
- *   .extractChannel(3)
- *   .toColourspace('b-w')
- *   .raw()
- *   .toBuffer();
- *
- * @returns {Sharp}
- */
-function raw () {
-  return this._updateFormatOut('raw');
-}
-
-/**
- * Use tile-based deep zoom (image pyramid) output.
- * Set the format and options for tile images via the `toFormat`, `jpeg`, `png` or `webp` functions.
- * Use a `.zip` or `.szi` file extension with `toFile` to write to a compressed archive file format.
- *
- * Warning: multiple sharp instances concurrently producing tile output can expose a possible race condition in some versions of libgsf.
- *
- * @example
- *  sharp('input.tiff')
- *   .png()
- *   .tile({
- *     size: 512
- *   })
- *   .toFile('output.dz', function(err, info) {
- *     // output.dzi is the Deep Zoom XML definition
- *     // output_files contains 512x512 tiles grouped by zoom level
- *   });
- *
- * @param {Object} [options]
- * @param {number} [options.size=256] tile size in pixels, a value between 1 and 8192.
- * @param {number} [options.overlap=0] tile overlap in pixels, a value between 0 and 8192.
- * @param {number} [options.angle=0] tile angle of rotation, must be a multiple of 90.
- * @param {string|Object} [options.background={r: 255, g: 255, b: 255, alpha: 1}] - background colour, parsed by the [color](https://www.npmjs.org/package/color) module, defaults to white without transparency.
- * @param {string} [options.depth] how deep to make the pyramid, possible values are `onepixel`, `onetile` or `one`, default based on layout.
- * @param {number} [options.skipBlanks=-1] threshold to skip tile generation, a value 0 - 255 for 8-bit images or 0 - 65535 for 16-bit images
- * @param {string} [options.container='fs'] tile container, with value `fs` (filesystem) or `zip` (compressed file).
- * @param {string} [options.layout='dz'] filesystem layout, possible values are `dz`, `iiif`, `zoomify` or `google`.
- * @param {boolean} [options.centre=false] centre image in tile.
- * @param {boolean} [options.center=false] alternative spelling of centre.
- * @param {string} [options.id='https://example.com/iiif'] when `layout` is `iiif`, sets the `@id` attribute of `info.json`
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function tile (options) {
-  if (is.object(options)) {
-    // Size of square tiles, in pixels
-    if (is.defined(options.size)) {
-      if (is.integer(options.size) && is.inRange(options.size, 1, 8192)) {
-        this.options.tileSize = options.size;
-      } else {
-        throw is.invalidParameterError('size', 'integer between 1 and 8192', options.size);
-      }
-    }
-    // Overlap of tiles, in pixels
-    if (is.defined(options.overlap)) {
-      if (is.integer(options.overlap) && is.inRange(options.overlap, 0, 8192)) {
-        if (options.overlap > this.options.tileSize) {
-          throw is.invalidParameterError('overlap', `<= size (${this.options.tileSize})`, options.overlap);
-        }
-        this.options.tileOverlap = options.overlap;
-      } else {
-        throw is.invalidParameterError('overlap', 'integer between 0 and 8192', options.overlap);
-      }
-    }
-    // Container
-    if (is.defined(options.container)) {
-      if (is.string(options.container) && is.inArray(options.container, ['fs', 'zip'])) {
-        this.options.tileContainer = options.container;
-      } else {
-        throw is.invalidParameterError('container', 'one of: fs, zip', options.container);
-      }
-    }
-    // Layout
-    if (is.defined(options.layout)) {
-      if (is.string(options.layout) && is.inArray(options.layout, ['dz', 'google', 'iiif', 'zoomify'])) {
-        this.options.tileLayout = options.layout;
-      } else {
-        throw is.invalidParameterError('layout', 'one of: dz, google, iiif, zoomify', options.layout);
-      }
-    }
-    // Angle of rotation,
-    if (is.defined(options.angle)) {
-      if (is.integer(options.angle) && !(options.angle % 90)) {
-        this.options.tileAngle = options.angle;
-      } else {
-        throw is.invalidParameterError('angle', 'positive/negative multiple of 90', options.angle);
-      }
-    }
-    // Background colour
-    this._setBackgroundColourOption('tileBackground', options.background);
-    // Depth of tiles
-    if (is.defined(options.depth)) {
-      if (is.string(options.depth) && is.inArray(options.depth, ['onepixel', 'onetile', 'one'])) {
-        this.options.tileDepth = options.depth;
-      } else {
-        throw is.invalidParameterError('depth', 'one of: onepixel, onetile, one', options.depth);
-      }
-    }
-    // Threshold to skip blank tiles
-    if (is.defined(options.skipBlanks)) {
-      if (is.integer(options.skipBlanks) && is.inRange(options.skipBlanks, -1, 65535)) {
-        this.options.tileSkipBlanks = options.skipBlanks;
-      } else {
-        throw is.invalidParameterError('skipBlanks', 'integer between -1 and 255/65535', options.skipBlanks);
-      }
-    } else if (is.defined(options.layout) && options.layout === 'google') {
-      this.options.tileSkipBlanks = 5;
-    }
-    // Center image in tile
-    const centre = is.bool(options.center) ? options.center : options.centre;
-    if (is.defined(centre)) {
-      this._setBooleanOption('tileCentre', centre);
-    }
-    // @id attribute for IIIF layout
-    if (is.defined(options.id)) {
-      if (is.string(options.id)) {
-        this.options.tileId = options.id;
-      } else {
-        throw is.invalidParameterError('id', 'string', options.id);
-      }
-    }
-  }
-  // Format
-  if (is.inArray(this.options.formatOut, ['jpeg', 'png', 'webp'])) {
-    this.options.tileFormat = this.options.formatOut;
-  } else if (this.options.formatOut !== 'input') {
-    throw is.invalidParameterError('format', 'one of: jpeg, png, webp', this.options.formatOut);
-  }
-  return this._updateFormatOut('dz');
-}
-
-/**
- * Update the output format unless options.force is false,
- * in which case revert to input format.
- * @private
- * @param {string} formatOut
- * @param {Object} [options]
- * @param {boolean} [options.force=true] - force output format, otherwise attempt to use input format
- * @returns {Sharp}
- */
-function _updateFormatOut (formatOut, options) {
-  if (!(is.object(options) && options.force === false)) {
-    this.options.formatOut = formatOut;
-  }
-  return this;
-}
-
-/**
- * Update a boolean attribute of the this.options Object.
- * @private
- * @param {string} key
- * @param {boolean} val
- * @throws {Error} Invalid key
- */
-function _setBooleanOption (key, val) {
-  if (is.bool(val)) {
-    this.options[key] = val;
-  } else {
-    throw is.invalidParameterError(key, 'boolean', val);
-  }
-}
-
-/**
- * Called by a WriteableStream to notify us it is ready for data.
- * @private
- */
-function _read () {
-  /* istanbul ignore else */
-  if (!this.options.streamOut) {
-    this.options.streamOut = true;
-    this._pipeline();
-  }
-}
-
-/**
- * Invoke the C++ image processing pipeline
- * Supports callback, stream and promise variants
- * @private
- */
-function _pipeline (callback) {
-  if (typeof callback === 'function') {
-    // output=file/buffer
-    if (this._isStreamInput()) {
-      // output=file/buffer, input=stream
-      this.on('finish', () => {
-        this._flattenBufferIn();
-        sharp.pipeline(this.options, callback);
-      });
-    } else {
-      // output=file/buffer, input=file/buffer
-      sharp.pipeline(this.options, callback);
-    }
-    return this;
-  } else if (this.options.streamOut) {
-    // output=stream
-    if (this._isStreamInput()) {
-      // output=stream, input=stream
-      this.once('finish', () => {
-        this._flattenBufferIn();
-        sharp.pipeline(this.options, (err, data, info) => {
-          if (err) {
-            this.emit('error', err);
-          } else {
-            this.emit('info', info);
-            this.push(data);
-          }
-          this.push(null);
-        });
-      });
-      if (this.streamInFinished) {
-        this.emit('finish');
-      }
-    } else {
-      // output=stream, input=file/buffer
-      sharp.pipeline(this.options, (err, data, info) => {
-        if (err) {
-          this.emit('error', err);
-        } else {
-          this.emit('info', info);
-          this.push(data);
-        }
-        this.push(null);
-      });
-    }
-    return this;
-  } else {
-    // output=promise
-    if (this._isStreamInput()) {
-      // output=promise, input=stream
-      return new Promise((resolve, reject) => {
-        this.once('finish', () => {
-          this._flattenBufferIn();
-          sharp.pipeline(this.options, (err, data, info) => {
-            if (err) {
-              reject(err);
-            } else {
-              if (this.options.resolveWithObject) {
-                resolve({ data, info });
-              } else {
-                resolve(data);
-              }
-            }
-          });
-        });
-      });
-    } else {
-      // output=promise, input=file/buffer
-      return new Promise((resolve, reject) => {
-        sharp.pipeline(this.options, (err, data, info) => {
-          if (err) {
-            reject(err);
-          } else {
-            if (this.options.resolveWithObject) {
-              resolve({ data: data, info: info });
-            } else {
-              resolve(data);
-            }
-          }
-        });
-      });
-    }
-  }
-}
-
-/**
- * Decorate the Sharp prototype with output-related functions.
- * @private
- */
-module.exports = function (Sharp) {
-  Object.assign(Sharp.prototype, {
-    // Public
-    toFile,
-    toBuffer,
-    withMetadata,
-    toFormat,
-    jpeg,
-    png,
-    webp,
-    tiff,
-    avif,
-    heif,
-    gif,
-    raw,
-    tile,
-    // Private
-    _updateFormatOut,
-    _setBooleanOption,
-    _read,
-    _pipeline
-  });
+    return null;
 };
+
+// class ZipEntry {{{
+/**
+ * An entry in the zip file.
+ * @constructor
+ * @param {Object} options Options of the current file.
+ * @param {Object} loadOptions Options for loading the stream.
+ */
+function ZipEntry(options, loadOptions) {
+    this.options = options;
+    this.loadOptions = loadOptions;
+}
+ZipEntry.prototype = {
+    /**
+     * say if the file is encrypted.
+     * @return {boolean} true if the file is encrypted, false otherwise.
+     */
+    isEncrypted: function() {
+        // bit 1 is set
+        return (this.bitFlag & 0x0001) === 0x0001;
+    },
+    /**
+     * say if the file has utf-8 filename/comment.
+     * @return {boolean} true if the filename/comment is in utf-8, false otherwise.
+     */
+    useUTF8: function() {
+        // bit 11 is set
+        return (this.bitFlag & 0x0800) === 0x0800;
+    },
+    /**
+     * Read the local part of a zip file and add the info in this object.
+     * @param {DataReader} reader the reader to use.
+     */
+    readLocalPart: function(reader) {
+        var compression, localExtraFieldsLength;
+
+        // we already know everything from the central dir !
+        // If the central dir data are false, we are doomed.
+        // On the bright side, the local part is scary  : zip64, data descriptors, both, etc.
+        // The less data we get here, the more reliable this should be.
+        // Let's skip the whole header and dash to the data !
+        reader.skip(22);
+        // in some zip created on windows, the filename stored in the central dir contains \ instead of /.
+        // Strangely, the filename here is OK.
+        // I would love to treat these zip files as corrupted (see http://www.info-zip.org/FAQ.html#backslashes
+        // or APPNOTE#4.4.17.1, "All slashes MUST be forward slashes '/'") but there are a lot of bad zip generators...
+        // Search "unzip mismatching "local" filename continuing with "central" filename version" on
+        // the internet.
+        //
+        // I think I see the logic here : the central directory is used to display
+        // content and the local directory is used to extract the files. Mixing / and \
+        // may be used to display \ to windows users and use / when extracting the files.
+        // Unfortunately, this lead also to some issues : http://seclists.org/fulldisclosure/2009/Sep/394
+        this.fileNameLength = reader.readInt(2);
+        localExtraFieldsLength = reader.readInt(2); // can't be sure this will be the same as the central dir
+        // the fileName is stored as binary data, the handleUTF8 method will take care of the encoding.
+        this.fileName = reader.readData(this.fileNameLength);
+        reader.skip(localExtraFieldsLength);
+
+        if (this.compressedSize === -1 || this.uncompressedSize === -1) {
+            throw new Error("Bug or corrupted zip : didn't get enough information from the central directory " + "(compressedSize === -1 || uncompressedSize === -1)");
+        }
+
+        compression = findCompression(this.compressionMethod);
+        if (compression === null) { // no compression found
+            throw new Error("Corrupted zip : compression " + utils.pretty(this.compressionMethod) + " unknown (inner file : " + utils.transformTo("string", this.fileName) + ")");
+        }
+        this.decompressed = new CompressedObject(this.compressedSize, this.uncompressedSize, this.crc32, compression, reader.readData(this.compressedSize));
+    },
+
+    /**
+     * Read the central part of a zip file and add the info in this object.
+     * @param {DataReader} reader the reader to use.
+     */
+    readCentralPart: function(reader) {
+        this.versionMadeBy = reader.readInt(2);
+        reader.skip(2);
+        // this.versionNeeded = reader.readInt(2);
+        this.bitFlag = reader.readInt(2);
+        this.compressionMethod = reader.readString(2);
+        this.date = reader.readDate();
+        this.crc32 = reader.readInt(4);
+        this.compressedSize = reader.readInt(4);
+        this.uncompressedSize = reader.readInt(4);
+        var fileNameLength = reader.readInt(2);
+        this.extraFieldsLength = reader.readInt(2);
+        this.fileCommentLength = reader.readInt(2);
+        this.diskNumberStart = reader.readInt(2);
+        this.internalFileAttributes = reader.readInt(2);
+        this.externalFileAttributes = reader.readInt(4);
+        this.localHeaderOffset = reader.readInt(4);
+
+        if (this.isEncrypted()) {
+            throw new Error("Encrypted zip are not supported");
+        }
+
+        // will be read in the local part, see the comments there
+        reader.skip(fileNameLength);
+        this.readExtraFields(reader);
+        this.parseZIP64ExtraField(reader);
+        this.fileComment = reader.readData(this.fileCommentLength);
+    },
+
+    /**
+     * Parse the external file attributes and get the unix/dos permissions.
+     */
+    processAttributes: function () {
+        this.unixPermissions = null;
+        this.dosPermissions = null;
+        var madeBy = this.versionMadeBy >> 8;
+
+        // Check if we have the DOS directory flag set.
+        // We look for it in the DOS and UNIX permissions
+        // but some unknown platform could set it as a compatibility flag.
+        this.dir = this.externalFileAttributes & 0x0010 ? true : false;
+
+        if(madeBy === MADE_BY_DOS) {
+            // first 6 bits (0 to 5)
+            this.dosPermissions = this.externalFileAttributes & 0x3F;
+        }
+
+        if(madeBy === MADE_BY_UNIX) {
+            this.unixPermissions = (this.externalFileAttributes >> 16) & 0xFFFF;
+            // the octal permissions are in (this.unixPermissions & 0x01FF).toString(8);
+        }
+
+        // fail safe : if the name ends with a / it probably means a folder
+        if (!this.dir && this.fileNameStr.slice(-1) === '/') {
+            this.dir = true;
+        }
+    },
+
+    /**
+     * Parse the ZIP64 extra field and merge the info in the current ZipEntry.
+     * @param {DataReader} reader the reader to use.
+     */
+    parseZIP64ExtraField: function(reader) {
+
+        if (!this.extraFields[0x0001]) {
+            return;
+        }
+
+        // should be something, preparing the extra reader
+        var extraReader = readerFor(this.extraFields[0x0001].value);
+
+        // I really hope that these 64bits integer can fit in 32 bits integer, because js
+        // won't let us have more.
+        if (this.uncompressedSize === utils.MAX_VALUE_32BITS) {
+            this.uncompressedSize = extraReader.readInt(8);
+        }
+        if (this.compressedSize === utils.MAX_VALUE_32BITS) {
+            this.compressedSize = extraReader.readInt(8);
+        }
+        if (this.localHeaderOffset === utils.MAX_VALUE_32BITS) {
+            this.localHeaderOffset = extraReader.readInt(8);
+        }
+        if (this.diskNumberStart === utils.MAX_VALUE_32BITS) {
+            this.diskNumberStart = extraReader.readInt(4);
+        }
+    },
+    /**
+     * Read the central part of a zip file and add the info in this object.
+     * @param {DataReader} reader the reader to use.
+     */
+    readExtraFields: function(reader) {
+        var end = reader.index + this.extraFieldsLength,
+            extraFieldId,
+            extraFieldLength,
+            extraFieldValue;
+
+        if (!this.extraFields) {
+            this.extraFields = {};
+        }
+
+        while (reader.index + 4 < end) {
+            extraFieldId = reader.readInt(2);
+            extraFieldLength = reader.readInt(2);
+            extraFieldValue = reader.readData(extraFieldLength);
+
+            this.extraFields[extraFieldId] = {
+                id: extraFieldId,
+                length: extraFieldLength,
+                value: extraFieldValue
+            };
+        }
+
+        reader.setIndex(end);
+    },
+    /**
+     * Apply an UTF8 transformation if needed.
+     */
+    handleUTF8: function() {
+        var decodeParamType = support.uint8array ? "uint8array" : "array";
+        if (this.useUTF8()) {
+            this.fileNameStr = utf8.utf8decode(this.fileName);
+            this.fileCommentStr = utf8.utf8decode(this.fileComment);
+        } else {
+            var upath = this.findExtraFieldUnicodePath();
+            if (upath !== null) {
+                this.fileNameStr = upath;
+            } else {
+                // ASCII text or unsupported code page
+                var fileNameByteArray =  utils.transformTo(decodeParamType, this.fileName);
+                this.fileNameStr = this.loadOptions.decodeFileName(fileNameByteArray);
+            }
+
+            var ucomment = this.findExtraFieldUnicodeComment();
+            if (ucomment !== null) {
+                this.fileCommentStr = ucomment;
+            } else {
+                // ASCII text or unsupported code page
+                var commentByteArray =  utils.transformTo(decodeParamType, this.fileComment);
+                this.fileCommentStr = this.loadOptions.decodeFileName(commentByteArray);
+            }
+        }
+    },
+
+    /**
+     * Find the unicode path declared in the extra field, if any.
+     * @return {String} the unicode path, null otherwise.
+     */
+    findExtraFieldUnicodePath: function() {
+        var upathField = this.extraFields[0x7075];
+        if (upathField) {
+            var extraReader = readerFor(upathField.value);
+
+            // wrong version
+            if (extraReader.readInt(1) !== 1) {
+                return null;
+            }
+
+            // the crc of the filename changed, this field is out of date.
+            if (crc32fn(this.fileName) !== extraReader.readInt(4)) {
+                return null;
+            }
+
+            return utf8.utf8decode(extraReader.readData(upathField.length - 5));
+        }
+        return null;
+    },
+
+    /**
+     * Find the unicode comment declared in the extra field, if any.
+     * @return {String} the unicode comment, null otherwise.
+     */
+    findExtraFieldUnicodeComment: function() {
+        var ucommentField = this.extraFields[0x6375];
+        if (ucommentField) {
+            var extraReader = readerFor(ucommentField.value);
+
+            // wrong version
+            if (extraReader.readInt(1) !== 1) {
+                return null;
+            }
+
+            // the crc of the comment changed, this field is out of date.
+            if (crc32fn(this.fileComment) !== extraReader.readInt(4)) {
+                return null;
+            }
+
+            return utf8.utf8decode(extraReader.readData(ucommentField.length - 5));
+        }
+        return null;
+    }
+};
+module.exports = ZipEntry;
 
 
 /***/ }),
-/* 22 */,
-/* 23 */,
-/* 24 */
+
+/***/ 24:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -6358,1096 +5605,8 @@ module.exports = copy
 
 
 /***/ }),
-/* 25 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const compare = __webpack_require__(233)
-const lt = (a, b, loose) => compare(a, b, loose) < 0
-module.exports = lt
-
-
-/***/ }),
-/* 26 */,
-/* 27 */,
-/* 28 */
-/***/ (function(__unusedmodule, exports) {
-
-"use strict";
-
-exports.LOCAL_FILE_HEADER = "PK\x03\x04";
-exports.CENTRAL_FILE_HEADER = "PK\x01\x02";
-exports.CENTRAL_DIRECTORY_END = "PK\x05\x06";
-exports.ZIP64_CENTRAL_DIRECTORY_LOCATOR = "PK\x06\x07";
-exports.ZIP64_CENTRAL_DIRECTORY_END = "PK\x06\x06";
-exports.DATA_DESCRIPTOR = "PK\x07\x08";
-
-
-/***/ }),
-/* 29 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-/* MIT license */
-var cssKeywords = __webpack_require__(710);
-
-// NOTE: conversions should only return primitive values (i.e. arrays, or
-//       values that give correct `typeof` results).
-//       do not use box values types (i.e. Number(), String(), etc.)
-
-var reverseKeywords = {};
-for (var key in cssKeywords) {
-	if (cssKeywords.hasOwnProperty(key)) {
-		reverseKeywords[cssKeywords[key]] = key;
-	}
-}
-
-var convert = module.exports = {
-	rgb: {channels: 3, labels: 'rgb'},
-	hsl: {channels: 3, labels: 'hsl'},
-	hsv: {channels: 3, labels: 'hsv'},
-	hwb: {channels: 3, labels: 'hwb'},
-	cmyk: {channels: 4, labels: 'cmyk'},
-	xyz: {channels: 3, labels: 'xyz'},
-	lab: {channels: 3, labels: 'lab'},
-	lch: {channels: 3, labels: 'lch'},
-	hex: {channels: 1, labels: ['hex']},
-	keyword: {channels: 1, labels: ['keyword']},
-	ansi16: {channels: 1, labels: ['ansi16']},
-	ansi256: {channels: 1, labels: ['ansi256']},
-	hcg: {channels: 3, labels: ['h', 'c', 'g']},
-	apple: {channels: 3, labels: ['r16', 'g16', 'b16']},
-	gray: {channels: 1, labels: ['gray']}
-};
-
-// hide .channels and .labels properties
-for (var model in convert) {
-	if (convert.hasOwnProperty(model)) {
-		if (!('channels' in convert[model])) {
-			throw new Error('missing channels property: ' + model);
-		}
-
-		if (!('labels' in convert[model])) {
-			throw new Error('missing channel labels property: ' + model);
-		}
-
-		if (convert[model].labels.length !== convert[model].channels) {
-			throw new Error('channel and label counts mismatch: ' + model);
-		}
-
-		var channels = convert[model].channels;
-		var labels = convert[model].labels;
-		delete convert[model].channels;
-		delete convert[model].labels;
-		Object.defineProperty(convert[model], 'channels', {value: channels});
-		Object.defineProperty(convert[model], 'labels', {value: labels});
-	}
-}
-
-convert.rgb.hsl = function (rgb) {
-	var r = rgb[0] / 255;
-	var g = rgb[1] / 255;
-	var b = rgb[2] / 255;
-	var min = Math.min(r, g, b);
-	var max = Math.max(r, g, b);
-	var delta = max - min;
-	var h;
-	var s;
-	var l;
-
-	if (max === min) {
-		h = 0;
-	} else if (r === max) {
-		h = (g - b) / delta;
-	} else if (g === max) {
-		h = 2 + (b - r) / delta;
-	} else if (b === max) {
-		h = 4 + (r - g) / delta;
-	}
-
-	h = Math.min(h * 60, 360);
-
-	if (h < 0) {
-		h += 360;
-	}
-
-	l = (min + max) / 2;
-
-	if (max === min) {
-		s = 0;
-	} else if (l <= 0.5) {
-		s = delta / (max + min);
-	} else {
-		s = delta / (2 - max - min);
-	}
-
-	return [h, s * 100, l * 100];
-};
-
-convert.rgb.hsv = function (rgb) {
-	var rdif;
-	var gdif;
-	var bdif;
-	var h;
-	var s;
-
-	var r = rgb[0] / 255;
-	var g = rgb[1] / 255;
-	var b = rgb[2] / 255;
-	var v = Math.max(r, g, b);
-	var diff = v - Math.min(r, g, b);
-	var diffc = function (c) {
-		return (v - c) / 6 / diff + 1 / 2;
-	};
-
-	if (diff === 0) {
-		h = s = 0;
-	} else {
-		s = diff / v;
-		rdif = diffc(r);
-		gdif = diffc(g);
-		bdif = diffc(b);
-
-		if (r === v) {
-			h = bdif - gdif;
-		} else if (g === v) {
-			h = (1 / 3) + rdif - bdif;
-		} else if (b === v) {
-			h = (2 / 3) + gdif - rdif;
-		}
-		if (h < 0) {
-			h += 1;
-		} else if (h > 1) {
-			h -= 1;
-		}
-	}
-
-	return [
-		h * 360,
-		s * 100,
-		v * 100
-	];
-};
-
-convert.rgb.hwb = function (rgb) {
-	var r = rgb[0];
-	var g = rgb[1];
-	var b = rgb[2];
-	var h = convert.rgb.hsl(rgb)[0];
-	var w = 1 / 255 * Math.min(r, Math.min(g, b));
-
-	b = 1 - 1 / 255 * Math.max(r, Math.max(g, b));
-
-	return [h, w * 100, b * 100];
-};
-
-convert.rgb.cmyk = function (rgb) {
-	var r = rgb[0] / 255;
-	var g = rgb[1] / 255;
-	var b = rgb[2] / 255;
-	var c;
-	var m;
-	var y;
-	var k;
-
-	k = Math.min(1 - r, 1 - g, 1 - b);
-	c = (1 - r - k) / (1 - k) || 0;
-	m = (1 - g - k) / (1 - k) || 0;
-	y = (1 - b - k) / (1 - k) || 0;
-
-	return [c * 100, m * 100, y * 100, k * 100];
-};
-
-/**
- * See https://en.m.wikipedia.org/wiki/Euclidean_distance#Squared_Euclidean_distance
- * */
-function comparativeDistance(x, y) {
-	return (
-		Math.pow(x[0] - y[0], 2) +
-		Math.pow(x[1] - y[1], 2) +
-		Math.pow(x[2] - y[2], 2)
-	);
-}
-
-convert.rgb.keyword = function (rgb) {
-	var reversed = reverseKeywords[rgb];
-	if (reversed) {
-		return reversed;
-	}
-
-	var currentClosestDistance = Infinity;
-	var currentClosestKeyword;
-
-	for (var keyword in cssKeywords) {
-		if (cssKeywords.hasOwnProperty(keyword)) {
-			var value = cssKeywords[keyword];
-
-			// Compute comparative distance
-			var distance = comparativeDistance(rgb, value);
-
-			// Check if its less, if so set as closest
-			if (distance < currentClosestDistance) {
-				currentClosestDistance = distance;
-				currentClosestKeyword = keyword;
-			}
-		}
-	}
-
-	return currentClosestKeyword;
-};
-
-convert.keyword.rgb = function (keyword) {
-	return cssKeywords[keyword];
-};
-
-convert.rgb.xyz = function (rgb) {
-	var r = rgb[0] / 255;
-	var g = rgb[1] / 255;
-	var b = rgb[2] / 255;
-
-	// assume sRGB
-	r = r > 0.04045 ? Math.pow(((r + 0.055) / 1.055), 2.4) : (r / 12.92);
-	g = g > 0.04045 ? Math.pow(((g + 0.055) / 1.055), 2.4) : (g / 12.92);
-	b = b > 0.04045 ? Math.pow(((b + 0.055) / 1.055), 2.4) : (b / 12.92);
-
-	var x = (r * 0.4124) + (g * 0.3576) + (b * 0.1805);
-	var y = (r * 0.2126) + (g * 0.7152) + (b * 0.0722);
-	var z = (r * 0.0193) + (g * 0.1192) + (b * 0.9505);
-
-	return [x * 100, y * 100, z * 100];
-};
-
-convert.rgb.lab = function (rgb) {
-	var xyz = convert.rgb.xyz(rgb);
-	var x = xyz[0];
-	var y = xyz[1];
-	var z = xyz[2];
-	var l;
-	var a;
-	var b;
-
-	x /= 95.047;
-	y /= 100;
-	z /= 108.883;
-
-	x = x > 0.008856 ? Math.pow(x, 1 / 3) : (7.787 * x) + (16 / 116);
-	y = y > 0.008856 ? Math.pow(y, 1 / 3) : (7.787 * y) + (16 / 116);
-	z = z > 0.008856 ? Math.pow(z, 1 / 3) : (7.787 * z) + (16 / 116);
-
-	l = (116 * y) - 16;
-	a = 500 * (x - y);
-	b = 200 * (y - z);
-
-	return [l, a, b];
-};
-
-convert.hsl.rgb = function (hsl) {
-	var h = hsl[0] / 360;
-	var s = hsl[1] / 100;
-	var l = hsl[2] / 100;
-	var t1;
-	var t2;
-	var t3;
-	var rgb;
-	var val;
-
-	if (s === 0) {
-		val = l * 255;
-		return [val, val, val];
-	}
-
-	if (l < 0.5) {
-		t2 = l * (1 + s);
-	} else {
-		t2 = l + s - l * s;
-	}
-
-	t1 = 2 * l - t2;
-
-	rgb = [0, 0, 0];
-	for (var i = 0; i < 3; i++) {
-		t3 = h + 1 / 3 * -(i - 1);
-		if (t3 < 0) {
-			t3++;
-		}
-		if (t3 > 1) {
-			t3--;
-		}
-
-		if (6 * t3 < 1) {
-			val = t1 + (t2 - t1) * 6 * t3;
-		} else if (2 * t3 < 1) {
-			val = t2;
-		} else if (3 * t3 < 2) {
-			val = t1 + (t2 - t1) * (2 / 3 - t3) * 6;
-		} else {
-			val = t1;
-		}
-
-		rgb[i] = val * 255;
-	}
-
-	return rgb;
-};
-
-convert.hsl.hsv = function (hsl) {
-	var h = hsl[0];
-	var s = hsl[1] / 100;
-	var l = hsl[2] / 100;
-	var smin = s;
-	var lmin = Math.max(l, 0.01);
-	var sv;
-	var v;
-
-	l *= 2;
-	s *= (l <= 1) ? l : 2 - l;
-	smin *= lmin <= 1 ? lmin : 2 - lmin;
-	v = (l + s) / 2;
-	sv = l === 0 ? (2 * smin) / (lmin + smin) : (2 * s) / (l + s);
-
-	return [h, sv * 100, v * 100];
-};
-
-convert.hsv.rgb = function (hsv) {
-	var h = hsv[0] / 60;
-	var s = hsv[1] / 100;
-	var v = hsv[2] / 100;
-	var hi = Math.floor(h) % 6;
-
-	var f = h - Math.floor(h);
-	var p = 255 * v * (1 - s);
-	var q = 255 * v * (1 - (s * f));
-	var t = 255 * v * (1 - (s * (1 - f)));
-	v *= 255;
-
-	switch (hi) {
-		case 0:
-			return [v, t, p];
-		case 1:
-			return [q, v, p];
-		case 2:
-			return [p, v, t];
-		case 3:
-			return [p, q, v];
-		case 4:
-			return [t, p, v];
-		case 5:
-			return [v, p, q];
-	}
-};
-
-convert.hsv.hsl = function (hsv) {
-	var h = hsv[0];
-	var s = hsv[1] / 100;
-	var v = hsv[2] / 100;
-	var vmin = Math.max(v, 0.01);
-	var lmin;
-	var sl;
-	var l;
-
-	l = (2 - s) * v;
-	lmin = (2 - s) * vmin;
-	sl = s * vmin;
-	sl /= (lmin <= 1) ? lmin : 2 - lmin;
-	sl = sl || 0;
-	l /= 2;
-
-	return [h, sl * 100, l * 100];
-};
-
-// http://dev.w3.org/csswg/css-color/#hwb-to-rgb
-convert.hwb.rgb = function (hwb) {
-	var h = hwb[0] / 360;
-	var wh = hwb[1] / 100;
-	var bl = hwb[2] / 100;
-	var ratio = wh + bl;
-	var i;
-	var v;
-	var f;
-	var n;
-
-	// wh + bl cant be > 1
-	if (ratio > 1) {
-		wh /= ratio;
-		bl /= ratio;
-	}
-
-	i = Math.floor(6 * h);
-	v = 1 - bl;
-	f = 6 * h - i;
-
-	if ((i & 0x01) !== 0) {
-		f = 1 - f;
-	}
-
-	n = wh + f * (v - wh); // linear interpolation
-
-	var r;
-	var g;
-	var b;
-	switch (i) {
-		default:
-		case 6:
-		case 0: r = v; g = n; b = wh; break;
-		case 1: r = n; g = v; b = wh; break;
-		case 2: r = wh; g = v; b = n; break;
-		case 3: r = wh; g = n; b = v; break;
-		case 4: r = n; g = wh; b = v; break;
-		case 5: r = v; g = wh; b = n; break;
-	}
-
-	return [r * 255, g * 255, b * 255];
-};
-
-convert.cmyk.rgb = function (cmyk) {
-	var c = cmyk[0] / 100;
-	var m = cmyk[1] / 100;
-	var y = cmyk[2] / 100;
-	var k = cmyk[3] / 100;
-	var r;
-	var g;
-	var b;
-
-	r = 1 - Math.min(1, c * (1 - k) + k);
-	g = 1 - Math.min(1, m * (1 - k) + k);
-	b = 1 - Math.min(1, y * (1 - k) + k);
-
-	return [r * 255, g * 255, b * 255];
-};
-
-convert.xyz.rgb = function (xyz) {
-	var x = xyz[0] / 100;
-	var y = xyz[1] / 100;
-	var z = xyz[2] / 100;
-	var r;
-	var g;
-	var b;
-
-	r = (x * 3.2406) + (y * -1.5372) + (z * -0.4986);
-	g = (x * -0.9689) + (y * 1.8758) + (z * 0.0415);
-	b = (x * 0.0557) + (y * -0.2040) + (z * 1.0570);
-
-	// assume sRGB
-	r = r > 0.0031308
-		? ((1.055 * Math.pow(r, 1.0 / 2.4)) - 0.055)
-		: r * 12.92;
-
-	g = g > 0.0031308
-		? ((1.055 * Math.pow(g, 1.0 / 2.4)) - 0.055)
-		: g * 12.92;
-
-	b = b > 0.0031308
-		? ((1.055 * Math.pow(b, 1.0 / 2.4)) - 0.055)
-		: b * 12.92;
-
-	r = Math.min(Math.max(0, r), 1);
-	g = Math.min(Math.max(0, g), 1);
-	b = Math.min(Math.max(0, b), 1);
-
-	return [r * 255, g * 255, b * 255];
-};
-
-convert.xyz.lab = function (xyz) {
-	var x = xyz[0];
-	var y = xyz[1];
-	var z = xyz[2];
-	var l;
-	var a;
-	var b;
-
-	x /= 95.047;
-	y /= 100;
-	z /= 108.883;
-
-	x = x > 0.008856 ? Math.pow(x, 1 / 3) : (7.787 * x) + (16 / 116);
-	y = y > 0.008856 ? Math.pow(y, 1 / 3) : (7.787 * y) + (16 / 116);
-	z = z > 0.008856 ? Math.pow(z, 1 / 3) : (7.787 * z) + (16 / 116);
-
-	l = (116 * y) - 16;
-	a = 500 * (x - y);
-	b = 200 * (y - z);
-
-	return [l, a, b];
-};
-
-convert.lab.xyz = function (lab) {
-	var l = lab[0];
-	var a = lab[1];
-	var b = lab[2];
-	var x;
-	var y;
-	var z;
-
-	y = (l + 16) / 116;
-	x = a / 500 + y;
-	z = y - b / 200;
-
-	var y2 = Math.pow(y, 3);
-	var x2 = Math.pow(x, 3);
-	var z2 = Math.pow(z, 3);
-	y = y2 > 0.008856 ? y2 : (y - 16 / 116) / 7.787;
-	x = x2 > 0.008856 ? x2 : (x - 16 / 116) / 7.787;
-	z = z2 > 0.008856 ? z2 : (z - 16 / 116) / 7.787;
-
-	x *= 95.047;
-	y *= 100;
-	z *= 108.883;
-
-	return [x, y, z];
-};
-
-convert.lab.lch = function (lab) {
-	var l = lab[0];
-	var a = lab[1];
-	var b = lab[2];
-	var hr;
-	var h;
-	var c;
-
-	hr = Math.atan2(b, a);
-	h = hr * 360 / 2 / Math.PI;
-
-	if (h < 0) {
-		h += 360;
-	}
-
-	c = Math.sqrt(a * a + b * b);
-
-	return [l, c, h];
-};
-
-convert.lch.lab = function (lch) {
-	var l = lch[0];
-	var c = lch[1];
-	var h = lch[2];
-	var a;
-	var b;
-	var hr;
-
-	hr = h / 360 * 2 * Math.PI;
-	a = c * Math.cos(hr);
-	b = c * Math.sin(hr);
-
-	return [l, a, b];
-};
-
-convert.rgb.ansi16 = function (args) {
-	var r = args[0];
-	var g = args[1];
-	var b = args[2];
-	var value = 1 in arguments ? arguments[1] : convert.rgb.hsv(args)[2]; // hsv -> ansi16 optimization
-
-	value = Math.round(value / 50);
-
-	if (value === 0) {
-		return 30;
-	}
-
-	var ansi = 30
-		+ ((Math.round(b / 255) << 2)
-		| (Math.round(g / 255) << 1)
-		| Math.round(r / 255));
-
-	if (value === 2) {
-		ansi += 60;
-	}
-
-	return ansi;
-};
-
-convert.hsv.ansi16 = function (args) {
-	// optimization here; we already know the value and don't need to get
-	// it converted for us.
-	return convert.rgb.ansi16(convert.hsv.rgb(args), args[2]);
-};
-
-convert.rgb.ansi256 = function (args) {
-	var r = args[0];
-	var g = args[1];
-	var b = args[2];
-
-	// we use the extended greyscale palette here, with the exception of
-	// black and white. normal palette only has 4 greyscale shades.
-	if (r === g && g === b) {
-		if (r < 8) {
-			return 16;
-		}
-
-		if (r > 248) {
-			return 231;
-		}
-
-		return Math.round(((r - 8) / 247) * 24) + 232;
-	}
-
-	var ansi = 16
-		+ (36 * Math.round(r / 255 * 5))
-		+ (6 * Math.round(g / 255 * 5))
-		+ Math.round(b / 255 * 5);
-
-	return ansi;
-};
-
-convert.ansi16.rgb = function (args) {
-	var color = args % 10;
-
-	// handle greyscale
-	if (color === 0 || color === 7) {
-		if (args > 50) {
-			color += 3.5;
-		}
-
-		color = color / 10.5 * 255;
-
-		return [color, color, color];
-	}
-
-	var mult = (~~(args > 50) + 1) * 0.5;
-	var r = ((color & 1) * mult) * 255;
-	var g = (((color >> 1) & 1) * mult) * 255;
-	var b = (((color >> 2) & 1) * mult) * 255;
-
-	return [r, g, b];
-};
-
-convert.ansi256.rgb = function (args) {
-	// handle greyscale
-	if (args >= 232) {
-		var c = (args - 232) * 10 + 8;
-		return [c, c, c];
-	}
-
-	args -= 16;
-
-	var rem;
-	var r = Math.floor(args / 36) / 5 * 255;
-	var g = Math.floor((rem = args % 36) / 6) / 5 * 255;
-	var b = (rem % 6) / 5 * 255;
-
-	return [r, g, b];
-};
-
-convert.rgb.hex = function (args) {
-	var integer = ((Math.round(args[0]) & 0xFF) << 16)
-		+ ((Math.round(args[1]) & 0xFF) << 8)
-		+ (Math.round(args[2]) & 0xFF);
-
-	var string = integer.toString(16).toUpperCase();
-	return '000000'.substring(string.length) + string;
-};
-
-convert.hex.rgb = function (args) {
-	var match = args.toString(16).match(/[a-f0-9]{6}|[a-f0-9]{3}/i);
-	if (!match) {
-		return [0, 0, 0];
-	}
-
-	var colorString = match[0];
-
-	if (match[0].length === 3) {
-		colorString = colorString.split('').map(function (char) {
-			return char + char;
-		}).join('');
-	}
-
-	var integer = parseInt(colorString, 16);
-	var r = (integer >> 16) & 0xFF;
-	var g = (integer >> 8) & 0xFF;
-	var b = integer & 0xFF;
-
-	return [r, g, b];
-};
-
-convert.rgb.hcg = function (rgb) {
-	var r = rgb[0] / 255;
-	var g = rgb[1] / 255;
-	var b = rgb[2] / 255;
-	var max = Math.max(Math.max(r, g), b);
-	var min = Math.min(Math.min(r, g), b);
-	var chroma = (max - min);
-	var grayscale;
-	var hue;
-
-	if (chroma < 1) {
-		grayscale = min / (1 - chroma);
-	} else {
-		grayscale = 0;
-	}
-
-	if (chroma <= 0) {
-		hue = 0;
-	} else
-	if (max === r) {
-		hue = ((g - b) / chroma) % 6;
-	} else
-	if (max === g) {
-		hue = 2 + (b - r) / chroma;
-	} else {
-		hue = 4 + (r - g) / chroma + 4;
-	}
-
-	hue /= 6;
-	hue %= 1;
-
-	return [hue * 360, chroma * 100, grayscale * 100];
-};
-
-convert.hsl.hcg = function (hsl) {
-	var s = hsl[1] / 100;
-	var l = hsl[2] / 100;
-	var c = 1;
-	var f = 0;
-
-	if (l < 0.5) {
-		c = 2.0 * s * l;
-	} else {
-		c = 2.0 * s * (1.0 - l);
-	}
-
-	if (c < 1.0) {
-		f = (l - 0.5 * c) / (1.0 - c);
-	}
-
-	return [hsl[0], c * 100, f * 100];
-};
-
-convert.hsv.hcg = function (hsv) {
-	var s = hsv[1] / 100;
-	var v = hsv[2] / 100;
-
-	var c = s * v;
-	var f = 0;
-
-	if (c < 1.0) {
-		f = (v - c) / (1 - c);
-	}
-
-	return [hsv[0], c * 100, f * 100];
-};
-
-convert.hcg.rgb = function (hcg) {
-	var h = hcg[0] / 360;
-	var c = hcg[1] / 100;
-	var g = hcg[2] / 100;
-
-	if (c === 0.0) {
-		return [g * 255, g * 255, g * 255];
-	}
-
-	var pure = [0, 0, 0];
-	var hi = (h % 1) * 6;
-	var v = hi % 1;
-	var w = 1 - v;
-	var mg = 0;
-
-	switch (Math.floor(hi)) {
-		case 0:
-			pure[0] = 1; pure[1] = v; pure[2] = 0; break;
-		case 1:
-			pure[0] = w; pure[1] = 1; pure[2] = 0; break;
-		case 2:
-			pure[0] = 0; pure[1] = 1; pure[2] = v; break;
-		case 3:
-			pure[0] = 0; pure[1] = w; pure[2] = 1; break;
-		case 4:
-			pure[0] = v; pure[1] = 0; pure[2] = 1; break;
-		default:
-			pure[0] = 1; pure[1] = 0; pure[2] = w;
-	}
-
-	mg = (1.0 - c) * g;
-
-	return [
-		(c * pure[0] + mg) * 255,
-		(c * pure[1] + mg) * 255,
-		(c * pure[2] + mg) * 255
-	];
-};
-
-convert.hcg.hsv = function (hcg) {
-	var c = hcg[1] / 100;
-	var g = hcg[2] / 100;
-
-	var v = c + g * (1.0 - c);
-	var f = 0;
-
-	if (v > 0.0) {
-		f = c / v;
-	}
-
-	return [hcg[0], f * 100, v * 100];
-};
-
-convert.hcg.hsl = function (hcg) {
-	var c = hcg[1] / 100;
-	var g = hcg[2] / 100;
-
-	var l = g * (1.0 - c) + 0.5 * c;
-	var s = 0;
-
-	if (l > 0.0 && l < 0.5) {
-		s = c / (2 * l);
-	} else
-	if (l >= 0.5 && l < 1.0) {
-		s = c / (2 * (1 - l));
-	}
-
-	return [hcg[0], s * 100, l * 100];
-};
-
-convert.hcg.hwb = function (hcg) {
-	var c = hcg[1] / 100;
-	var g = hcg[2] / 100;
-	var v = c + g * (1.0 - c);
-	return [hcg[0], (v - c) * 100, (1 - v) * 100];
-};
-
-convert.hwb.hcg = function (hwb) {
-	var w = hwb[1] / 100;
-	var b = hwb[2] / 100;
-	var v = 1 - b;
-	var c = v - w;
-	var g = 0;
-
-	if (c < 1) {
-		g = (v - c) / (1 - c);
-	}
-
-	return [hwb[0], c * 100, g * 100];
-};
-
-convert.apple.rgb = function (apple) {
-	return [(apple[0] / 65535) * 255, (apple[1] / 65535) * 255, (apple[2] / 65535) * 255];
-};
-
-convert.rgb.apple = function (rgb) {
-	return [(rgb[0] / 255) * 65535, (rgb[1] / 255) * 65535, (rgb[2] / 255) * 65535];
-};
-
-convert.gray.rgb = function (args) {
-	return [args[0] / 100 * 255, args[0] / 100 * 255, args[0] / 100 * 255];
-};
-
-convert.gray.hsl = convert.gray.hsv = function (args) {
-	return [0, 0, args[0]];
-};
-
-convert.gray.hwb = function (gray) {
-	return [0, 100, gray[0]];
-};
-
-convert.gray.cmyk = function (gray) {
-	return [0, 0, 0, gray[0]];
-};
-
-convert.gray.lab = function (gray) {
-	return [gray[0], 0, 0];
-};
-
-convert.gray.hex = function (gray) {
-	var val = Math.round(gray[0] / 100 * 255) & 0xFF;
-	var integer = (val << 16) + (val << 8) + val;
-
-	var string = integer.toString(16).toUpperCase();
-	return '000000'.substring(string.length) + string;
-};
-
-convert.rgb.gray = function (rgb) {
-	var val = (rgb[0] + rgb[1] + rgb[2]) / 3;
-	return [val / 255 * 100];
-};
-
-
-/***/ }),
-/* 30 */,
-/* 31 */,
-/* 32 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-function __ncc_wildcard$0 (arg) {
-  if (arg === "8.10.6") return __webpack_require__(150);
-}
-'use strict';
-
-const events = __webpack_require__(614);
-const detectLibc = __webpack_require__(101);
-
-const is = __webpack_require__(64);
-const sharp = __webpack_require__(525);
-
-/**
- * An Object containing nested boolean values representing the available input and output formats/methods.
- * @member
- * @example
- * console.log(sharp.format);
- * @returns {Object}
- */
-const format = sharp.format();
-
-/**
- * An Object containing the available interpolators and their proper values
- * @readonly
- * @enum {string}
- */
-const interpolators = {
-  /** [Nearest neighbour interpolation](http://en.wikipedia.org/wiki/Nearest-neighbor_interpolation). Suitable for image enlargement only. */
-  nearest: 'nearest',
-  /** [Bilinear interpolation](http://en.wikipedia.org/wiki/Bilinear_interpolation). Faster than bicubic but with less smooth results. */
-  bilinear: 'bilinear',
-  /** [Bicubic interpolation](http://en.wikipedia.org/wiki/Bicubic_interpolation) (the default). */
-  bicubic: 'bicubic',
-  /** [LBB interpolation](https://github.com/jcupitt/libvips/blob/master/libvips/resample/lbb.cpp#L100). Prevents some "[acutance](http://en.wikipedia.org/wiki/Acutance)" but typically reduces performance by a factor of 2. */
-  locallyBoundedBicubic: 'lbb',
-  /** [Nohalo interpolation](http://eprints.soton.ac.uk/268086/). Prevents acutance but typically reduces performance by a factor of 3. */
-  nohalo: 'nohalo',
-  /** [VSQBS interpolation](https://github.com/jcupitt/libvips/blob/master/libvips/resample/vsqbs.cpp#L48). Prevents "staircasing" when enlarging. */
-  vertexSplitQuadraticBasisSpline: 'vsqbs'
-};
-
-/**
- * An Object containing the version numbers of libvips and its dependencies.
- * @member
- * @example
- * console.log(sharp.versions);
- */
-let versions = {
-  vips: sharp.libvipsVersion()
-};
-try {
-  versions = __ncc_wildcard$0(versions.vips);
-} catch (err) {}
-
-/**
- * Gets or, when options are provided, sets the limits of _libvips'_ operation cache.
- * Existing entries in the cache will be trimmed after any change in limits.
- * This method always returns cache statistics,
- * useful for determining how much working memory is required for a particular task.
- *
- * @example
- * const stats = sharp.cache();
- * @example
- * sharp.cache( { items: 200 } );
- * sharp.cache( { files: 0 } );
- * sharp.cache(false);
- *
- * @param {Object|boolean} [options=true] - Object with the following attributes, or boolean where true uses default cache settings and false removes all caching
- * @param {number} [options.memory=50] - is the maximum memory in MB to use for this cache
- * @param {number} [options.files=20] - is the maximum number of files to hold open
- * @param {number} [options.items=100] - is the maximum number of operations to cache
- * @returns {Object}
- */
-function cache (options) {
-  if (is.bool(options)) {
-    if (options) {
-      // Default cache settings of 50MB, 20 files, 100 items
-      return sharp.cache(50, 20, 100);
-    } else {
-      return sharp.cache(0, 0, 0);
-    }
-  } else if (is.object(options)) {
-    return sharp.cache(options.memory, options.files, options.items);
-  } else {
-    return sharp.cache();
-  }
-}
-cache(true);
-
-/**
- * Gets or, when a concurrency is provided, sets
- * the number of threads _libvips'_ should create to process each image.
- *
- * The default value is the number of CPU cores,
- * except when using glibc-based Linux without jemalloc,
- * where the default is `1` to help reduce memory fragmentation.
- *
- * A value of `0` will reset this to the number of CPU cores.
- *
- * The maximum number of images that can be processed in parallel
- * is limited by libuv's `UV_THREADPOOL_SIZE` environment variable.
- *
- * This method always returns the current concurrency.
- *
- * @example
- * const threads = sharp.concurrency(); // 4
- * sharp.concurrency(2); // 2
- * sharp.concurrency(0); // 4
- *
- * @param {number} [concurrency]
- * @returns {number} concurrency
- */
-function concurrency (concurrency) {
-  return sharp.concurrency(is.integer(concurrency) ? concurrency : null);
-}
-/* istanbul ignore next */
-if (detectLibc.family === detectLibc.GLIBC && !sharp._isUsingJemalloc()) {
-  // Reduce default concurrency to 1 when using glibc memory allocator
-  sharp.concurrency(1);
-}
-
-/**
- * An EventEmitter that emits a `change` event when a task is either:
- * - queued, waiting for _libuv_ to provide a worker thread
- * - complete
- * @member
- * @example
- * sharp.queue.on('change', function(queueLength) {
- *   console.log('Queue contains ' + queueLength + ' task(s)');
- * });
- */
-const queue = new events.EventEmitter();
-
-/**
- * Provides access to internal task counters.
- * - queue is the number of tasks this module has queued waiting for _libuv_ to provide a worker thread from its pool.
- * - process is the number of resize tasks currently being processed.
- *
- * @example
- * const counters = sharp.counters(); // { queue: 2, process: 4 }
- *
- * @returns {Object}
- */
-function counters () {
-  return sharp.counters();
-}
-
-/**
- * Get and set use of SIMD vector unit instructions.
- * Requires libvips to have been compiled with liborc support.
- *
- * Improves the performance of `resize`, `blur` and `sharpen` operations
- * by taking advantage of the SIMD vector unit of the CPU, e.g. Intel SSE and ARM NEON.
- *
- * @example
- * const simd = sharp.simd();
- * // simd is `true` if the runtime use of liborc is currently enabled
- * @example
- * const simd = sharp.simd(false);
- * // prevent libvips from using liborc at runtime
- *
- * @param {boolean} [simd=true]
- * @returns {boolean}
- */
-function simd (simd) {
-  return sharp.simd(is.bool(simd) ? simd : null);
-}
-simd(true);
-
-/**
- * Decorate the Sharp class with utility-related functions.
- * @private
- */
-module.exports = function (Sharp) {
-  Sharp.cache = cache;
-  Sharp.concurrency = concurrency;
-  Sharp.counters = counters;
-  Sharp.simd = simd;
-  Sharp.format = format;
-  Sharp.interpolators = interpolators;
-  Sharp.versions = versions;
-  Sharp.queue = queue;
-};
-
-
-/***/ }),
-/* 33 */
+/***/ 33:
 /***/ (function(__unusedmodule, exports) {
 
 "use strict";
@@ -7559,11 +5718,8 @@ exports.setTyped(TYPED_OK);
 
 
 /***/ }),
-/* 34 */,
-/* 35 */,
-/* 36 */,
-/* 37 */,
-/* 38 */
+
+/***/ 38:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -7638,26 +5794,8 @@ module.exports = (
 
 
 /***/ }),
-/* 39 */
-/***/ (function(module) {
 
-const debug = (
-  typeof process === 'object' &&
-  process.env &&
-  process.env.NODE_DEBUG &&
-  /\bsemver\b/i.test(process.env.NODE_DEBUG)
-) ? (...args) => console.error('SEMVER', ...args)
-  : () => {}
-
-module.exports = debug
-
-
-/***/ }),
-/* 40 */,
-/* 41 */,
-/* 42 */,
-/* 43 */,
-/* 44 */
+/***/ 44:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -7721,74 +5859,8 @@ module.exports = ArrayReader;
 
 
 /***/ }),
-/* 45 */,
-/* 46 */
-/***/ (function(module) {
 
-"use strict";
-
-
-// Note: we can't get significant speed boost here.
-// So write code to minimize size - no pregenerated tables
-// and array tools dependencies.
-
-// (C) 1995-2013 Jean-loup Gailly and Mark Adler
-// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
-//
-// This software is provided 'as-is', without any express or implied
-// warranty. In no event will the authors be held liable for any damages
-// arising from the use of this software.
-//
-// Permission is granted to anyone to use this software for any purpose,
-// including commercial applications, and to alter it and redistribute it
-// freely, subject to the following restrictions:
-//
-// 1. The origin of this software must not be misrepresented; you must not
-//   claim that you wrote the original software. If you use this software
-//   in a product, an acknowledgment in the product documentation would be
-//   appreciated but is not required.
-// 2. Altered source versions must be plainly marked as such, and must not be
-//   misrepresented as being the original software.
-// 3. This notice may not be removed or altered from any source distribution.
-
-// Use ordinary array, since untyped makes no boost here
-function makeTable() {
-  var c, table = [];
-
-  for (var n = 0; n < 256; n++) {
-    c = n;
-    for (var k = 0; k < 8; k++) {
-      c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
-    }
-    table[n] = c;
-  }
-
-  return table;
-}
-
-// Create table on load. Just 255 signed longs. Not a problem.
-var crcTable = makeTable();
-
-
-function crc32(crc, buf, len, pos) {
-  var t = crcTable,
-      end = pos + len;
-
-  crc ^= -1;
-
-  for (var i = pos; i < end; i++) {
-    crc = (crc >>> 8) ^ t[(crc ^ buf[i]) & 0xFF];
-  }
-
-  return (crc ^ (-1)); // >>> 0;
-}
-
-
-module.exports = crc32;
-
-
-/***/ }),
-/* 47 */
+/***/ 47:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -7807,167 +5879,15 @@ module.exports = outputJson
 
 
 /***/ }),
-/* 48 */,
-/* 49 */,
-/* 50 */,
-/* 51 */,
-/* 52 */,
-/* 53 */,
-/* 54 */,
-/* 55 */,
-/* 56 */,
-/* 57 */,
-/* 58 */,
-/* 59 */
+
+/***/ 59:
 /***/ (function(module) {
 
 module.exports = require("assert");
 
 /***/ }),
-/* 60 */,
-/* 61 */,
-/* 62 */,
-/* 63 */,
-/* 64 */
-/***/ (function(module) {
 
-"use strict";
-
-
-/**
- * Is this value defined and not null?
- * @private
- */
-const defined = function (val) {
-  return typeof val !== 'undefined' && val !== null;
-};
-
-/**
- * Is this value an object?
- * @private
- */
-const object = function (val) {
-  return typeof val === 'object';
-};
-
-/**
- * Is this value a plain object?
- * @private
- */
-const plainObject = function (val) {
-  return Object.prototype.toString.call(val) === '[object Object]';
-};
-
-/**
- * Is this value a function?
- * @private
- */
-const fn = function (val) {
-  return typeof val === 'function';
-};
-
-/**
- * Is this value a boolean?
- * @private
- */
-const bool = function (val) {
-  return typeof val === 'boolean';
-};
-
-/**
- * Is this value a Buffer object?
- * @private
- */
-const buffer = function (val) {
-  return val instanceof Buffer;
-};
-
-/**
- * Is this value a Uint8Array or Uint8ClampedArray object?
- * @private
- */
-const uint8Array = function (val) {
-  // allow both since Uint8ClampedArray simply clamps the values between 0-255
-  return val instanceof Uint8Array || val instanceof Uint8ClampedArray;
-};
-
-/**
- * Is this value a non-empty string?
- * @private
- */
-const string = function (val) {
-  return typeof val === 'string' && val.length > 0;
-};
-
-/**
- * Is this value a real number?
- * @private
- */
-const number = function (val) {
-  return typeof val === 'number' && !Number.isNaN(val);
-};
-
-/**
- * Is this value an integer?
- * @private
- */
-const integer = function (val) {
-  return Number.isInteger(val);
-};
-
-/**
- * Is this value within an inclusive given range?
- * @private
- */
-const inRange = function (val, min, max) {
-  return val >= min && val <= max;
-};
-
-/**
- * Is this value within the elements of an array?
- * @private
- */
-const inArray = function (val, list) {
-  return list.includes(val);
-};
-
-/**
- * Create an Error with a message relating to an invalid parameter.
- *
- * @param {string} name - parameter name.
- * @param {string} expected - description of the type/value/range expected.
- * @param {*} actual - the value received.
- * @returns {Error} Containing the formatted message.
- * @private
- */
-const invalidParameterError = function (name, expected, actual) {
-  return new Error(
-    `Expected ${expected} for ${name} but received ${actual} of type ${typeof actual}`
-  );
-};
-
-module.exports = {
-  defined: defined,
-  object: object,
-  plainObject: plainObject,
-  fn: fn,
-  bool: bool,
-  buffer: buffer,
-  uint8Array: uint8Array,
-  string: string,
-  number: number,
-  integer: integer,
-  inRange: inRange,
-  inArray: inArray,
-  invalidParameterError: invalidParameterError
-};
-
-
-/***/ }),
-/* 65 */,
-/* 66 */,
-/* 67 */,
-/* 68 */
+/***/ 64:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -7977,7 +5897,7 @@ var utils = __webpack_require__(901);
 var GenericWorker = __webpack_require__(186);
 var utf8 = __webpack_require__(341);
 var crc32 = __webpack_require__(734);
-var signature = __webpack_require__(28);
+var signature = __webpack_require__(150);
 
 /**
  * Transform an integer into a string in hexadecimal.
@@ -8514,9 +6434,8 @@ module.exports = ZipFileWorker;
 
 
 /***/ }),
-/* 69 */,
-/* 70 */,
-/* 71 */
+
+/***/ 71:
 /***/ (function(module) {
 
 "use strict";
@@ -8585,10 +6504,8 @@ function range(a, b, str) {
 
 
 /***/ }),
-/* 72 */,
-/* 73 */,
-/* 74 */,
-/* 75 */
+
+/***/ 75:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -8620,10 +6537,8 @@ module.exports = function settle(resolve, reject, response) {
 
 
 /***/ }),
-/* 76 */,
-/* 77 */,
-/* 78 */,
-/* 79 */
+
+/***/ 79:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -8650,452 +6565,121 @@ module.exports = function buildFullPath(baseURL, requestedURL) {
 
 
 /***/ }),
-/* 80 */,
-/* 81 */,
-/* 82 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const debug = __webpack_require__(39)
-const { MAX_LENGTH, MAX_SAFE_INTEGER } = __webpack_require__(248)
-const { re, t } = __webpack_require__(609)
-
-const parseOptions = __webpack_require__(849)
-const { compareIdentifiers } = __webpack_require__(610)
-class SemVer {
-  constructor (version, options) {
-    options = parseOptions(options)
-
-    if (version instanceof SemVer) {
-      if (version.loose === !!options.loose &&
-          version.includePrerelease === !!options.includePrerelease) {
-        return version
-      } else {
-        version = version.version
-      }
-    } else if (typeof version !== 'string') {
-      throw new TypeError(`Invalid Version: ${version}`)
-    }
-
-    if (version.length > MAX_LENGTH) {
-      throw new TypeError(
-        `version is longer than ${MAX_LENGTH} characters`
-      )
-    }
-
-    debug('SemVer', version, options)
-    this.options = options
-    this.loose = !!options.loose
-    // this isn't actually relevant for versions, but keep it so that we
-    // don't run into trouble passing this.options around.
-    this.includePrerelease = !!options.includePrerelease
-
-    const m = version.trim().match(options.loose ? re[t.LOOSE] : re[t.FULL])
-
-    if (!m) {
-      throw new TypeError(`Invalid Version: ${version}`)
-    }
-
-    this.raw = version
-
-    // these are actually numbers
-    this.major = +m[1]
-    this.minor = +m[2]
-    this.patch = +m[3]
-
-    if (this.major > MAX_SAFE_INTEGER || this.major < 0) {
-      throw new TypeError('Invalid major version')
-    }
-
-    if (this.minor > MAX_SAFE_INTEGER || this.minor < 0) {
-      throw new TypeError('Invalid minor version')
-    }
-
-    if (this.patch > MAX_SAFE_INTEGER || this.patch < 0) {
-      throw new TypeError('Invalid patch version')
-    }
-
-    // numberify any prerelease numeric ids
-    if (!m[4]) {
-      this.prerelease = []
-    } else {
-      this.prerelease = m[4].split('.').map((id) => {
-        if (/^[0-9]+$/.test(id)) {
-          const num = +id
-          if (num >= 0 && num < MAX_SAFE_INTEGER) {
-            return num
-          }
-        }
-        return id
-      })
-    }
-
-    this.build = m[5] ? m[5].split('.') : []
-    this.format()
-  }
-
-  format () {
-    this.version = `${this.major}.${this.minor}.${this.patch}`
-    if (this.prerelease.length) {
-      this.version += `-${this.prerelease.join('.')}`
-    }
-    return this.version
-  }
-
-  toString () {
-    return this.version
-  }
-
-  compare (other) {
-    debug('SemVer.compare', this.version, this.options, other)
-    if (!(other instanceof SemVer)) {
-      if (typeof other === 'string' && other === this.version) {
-        return 0
-      }
-      other = new SemVer(other, this.options)
-    }
-
-    if (other.version === this.version) {
-      return 0
-    }
-
-    return this.compareMain(other) || this.comparePre(other)
-  }
-
-  compareMain (other) {
-    if (!(other instanceof SemVer)) {
-      other = new SemVer(other, this.options)
-    }
-
-    return (
-      compareIdentifiers(this.major, other.major) ||
-      compareIdentifiers(this.minor, other.minor) ||
-      compareIdentifiers(this.patch, other.patch)
-    )
-  }
-
-  comparePre (other) {
-    if (!(other instanceof SemVer)) {
-      other = new SemVer(other, this.options)
-    }
-
-    // NOT having a prerelease is > having one
-    if (this.prerelease.length && !other.prerelease.length) {
-      return -1
-    } else if (!this.prerelease.length && other.prerelease.length) {
-      return 1
-    } else if (!this.prerelease.length && !other.prerelease.length) {
-      return 0
-    }
-
-    let i = 0
-    do {
-      const a = this.prerelease[i]
-      const b = other.prerelease[i]
-      debug('prerelease compare', i, a, b)
-      if (a === undefined && b === undefined) {
-        return 0
-      } else if (b === undefined) {
-        return 1
-      } else if (a === undefined) {
-        return -1
-      } else if (a === b) {
-        continue
-      } else {
-        return compareIdentifiers(a, b)
-      }
-    } while (++i)
-  }
-
-  compareBuild (other) {
-    if (!(other instanceof SemVer)) {
-      other = new SemVer(other, this.options)
-    }
-
-    let i = 0
-    do {
-      const a = this.build[i]
-      const b = other.build[i]
-      debug('prerelease compare', i, a, b)
-      if (a === undefined && b === undefined) {
-        return 0
-      } else if (b === undefined) {
-        return 1
-      } else if (a === undefined) {
-        return -1
-      } else if (a === b) {
-        continue
-      } else {
-        return compareIdentifiers(a, b)
-      }
-    } while (++i)
-  }
-
-  // preminor will bump the version up to the next minor release, and immediately
-  // down to pre-release. premajor and prepatch work the same way.
-  inc (release, identifier) {
-    switch (release) {
-      case 'premajor':
-        this.prerelease.length = 0
-        this.patch = 0
-        this.minor = 0
-        this.major++
-        this.inc('pre', identifier)
-        break
-      case 'preminor':
-        this.prerelease.length = 0
-        this.patch = 0
-        this.minor++
-        this.inc('pre', identifier)
-        break
-      case 'prepatch':
-        // If this is already a prerelease, it will bump to the next version
-        // drop any prereleases that might already exist, since they are not
-        // relevant at this point.
-        this.prerelease.length = 0
-        this.inc('patch', identifier)
-        this.inc('pre', identifier)
-        break
-      // If the input is a non-prerelease version, this acts the same as
-      // prepatch.
-      case 'prerelease':
-        if (this.prerelease.length === 0) {
-          this.inc('patch', identifier)
-        }
-        this.inc('pre', identifier)
-        break
-
-      case 'major':
-        // If this is a pre-major version, bump up to the same major version.
-        // Otherwise increment major.
-        // 1.0.0-5 bumps to 1.0.0
-        // 1.1.0 bumps to 2.0.0
-        if (
-          this.minor !== 0 ||
-          this.patch !== 0 ||
-          this.prerelease.length === 0
-        ) {
-          this.major++
-        }
-        this.minor = 0
-        this.patch = 0
-        this.prerelease = []
-        break
-      case 'minor':
-        // If this is a pre-minor version, bump up to the same minor version.
-        // Otherwise increment minor.
-        // 1.2.0-5 bumps to 1.2.0
-        // 1.2.1 bumps to 1.3.0
-        if (this.patch !== 0 || this.prerelease.length === 0) {
-          this.minor++
-        }
-        this.patch = 0
-        this.prerelease = []
-        break
-      case 'patch':
-        // If this is not a pre-release version, it will increment the patch.
-        // If it is a pre-release it will bump up to the same patch version.
-        // 1.2.0-5 patches to 1.2.0
-        // 1.2.0 patches to 1.2.1
-        if (this.prerelease.length === 0) {
-          this.patch++
-        }
-        this.prerelease = []
-        break
-      // This probably shouldn't be used publicly.
-      // 1.0.0 'pre' would become 1.0.0-0 which is the wrong direction.
-      case 'pre':
-        if (this.prerelease.length === 0) {
-          this.prerelease = [0]
-        } else {
-          let i = this.prerelease.length
-          while (--i >= 0) {
-            if (typeof this.prerelease[i] === 'number') {
-              this.prerelease[i]++
-              i = -2
-            }
-          }
-          if (i === -1) {
-            // didn't increment anything
-            this.prerelease.push(0)
-          }
-        }
-        if (identifier) {
-          // 1.2.0-beta.1 bumps to 1.2.0-beta.2,
-          // 1.2.0-beta.fooblz or 1.2.0-beta bumps to 1.2.0-beta.0
-          if (this.prerelease[0] === identifier) {
-            if (isNaN(this.prerelease[1])) {
-              this.prerelease = [identifier, 0]
-            }
-          } else {
-            this.prerelease = [identifier, 0]
-          }
-        }
-        break
-
-      default:
-        throw new Error(`invalid increment argument: ${release}`)
-    }
-    this.format()
-    this.raw = this.version
-    return this
-  }
-}
-
-module.exports = SemVer
-
-
-/***/ }),
-/* 83 */,
-/* 84 */,
-/* 85 */,
-/* 86 */,
-/* 87 */
-/***/ (function(module) {
-
-module.exports = require("os");
-
-/***/ }),
-/* 88 */
+/***/ 82:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
 
-const color = __webpack_require__(492);
-const is = __webpack_require__(64);
+var utils = __webpack_require__(318);
+var normalizeHeaderName = __webpack_require__(575);
 
-/**
- * Colourspaces.
- * @private
- */
-const colourspace = {
-  multiband: 'multiband',
-  'b-w': 'b-w',
-  bw: 'b-w',
-  cmyk: 'cmyk',
-  srgb: 'srgb'
+var DEFAULT_CONTENT_TYPE = {
+  'Content-Type': 'application/x-www-form-urlencoded'
 };
 
-/**
- * Tint the image using the provided chroma while preserving the image luminance.
- * An alpha channel may be present and will be unchanged by the operation.
- *
- * @param {string|Object} rgb - parsed by the [color](https://www.npmjs.org/package/color) module to extract chroma values.
- * @returns {Sharp}
- * @throws {Error} Invalid parameter
- */
-function tint (rgb) {
-  const colour = color(rgb);
-  this.options.tintA = colour.a();
-  this.options.tintB = colour.b();
-  return this;
-}
-
-/**
- * Convert to 8-bit greyscale; 256 shades of grey.
- * This is a linear operation. If the input image is in a non-linear colour space such as sRGB, use `gamma()` with `greyscale()` for the best results.
- * By default the output image will be web-friendly sRGB and contain three (identical) color channels.
- * This may be overridden by other sharp operations such as `toColourspace('b-w')`,
- * which will produce an output image containing one color channel.
- * An alpha channel may be present, and will be unchanged by the operation.
- * @param {Boolean} [greyscale=true]
- * @returns {Sharp}
- */
-function greyscale (greyscale) {
-  this.options.greyscale = is.bool(greyscale) ? greyscale : true;
-  return this;
-}
-
-/**
- * Alternative spelling of `greyscale`.
- * @param {Boolean} [grayscale=true]
- * @returns {Sharp}
- */
-function grayscale (grayscale) {
-  return this.greyscale(grayscale);
-}
-
-/**
- * Set the output colourspace.
- * By default output image will be web-friendly sRGB, with additional channels interpreted as alpha channels.
- *
- * @example
- * // Output 16 bits per pixel RGB
- * await sharp(input)
- *  .toColourspace('rgb16')
- *  .toFile('16-bpp.png')
- *
- * @param {string} [colourspace] - output colourspace e.g. `srgb`, `rgb`, `cmyk`, `lab`, `b-w` [...](https://github.com/libvips/libvips/blob/master/libvips/iofuncs/enumtypes.c#L568)
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function toColourspace (colourspace) {
-  if (!is.string(colourspace)) {
-    throw is.invalidParameterError('colourspace', 'string', colourspace);
+function setContentTypeIfUnset(headers, value) {
+  if (!utils.isUndefined(headers) && utils.isUndefined(headers['Content-Type'])) {
+    headers['Content-Type'] = value;
   }
-  this.options.colourspace = colourspace;
-  return this;
 }
 
-/**
- * Alternative spelling of `toColourspace`.
- * @param {string} [colorspace] - output colorspace.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function toColorspace (colorspace) {
-  return this.toColourspace(colorspace);
+function getDefaultAdapter() {
+  var adapter;
+  if (typeof XMLHttpRequest !== 'undefined') {
+    // For browsers use XHR adapter
+    adapter = __webpack_require__(943);
+  } else if (typeof process !== 'undefined' && Object.prototype.toString.call(process) === '[object process]') {
+    // For node use HTTP adapter
+    adapter = __webpack_require__(930);
+  }
+  return adapter;
 }
 
-/**
- * Update a colour attribute of the this.options Object.
- * @private
- * @param {string} key
- * @param {string|Object} value
- * @throws {Error} Invalid value
- */
-function _setBackgroundColourOption (key, value) {
-  if (is.defined(value)) {
-    if (is.object(value) || is.string(value)) {
-      const colour = color(value);
-      this.options[key] = [
-        colour.red(),
-        colour.green(),
-        colour.blue(),
-        Math.round(colour.alpha() * 255)
-      ];
-    } else {
-      throw is.invalidParameterError('background', 'object or string', value);
+var defaults = {
+  adapter: getDefaultAdapter(),
+
+  transformRequest: [function transformRequest(data, headers) {
+    normalizeHeaderName(headers, 'Accept');
+    normalizeHeaderName(headers, 'Content-Type');
+    if (utils.isFormData(data) ||
+      utils.isArrayBuffer(data) ||
+      utils.isBuffer(data) ||
+      utils.isStream(data) ||
+      utils.isFile(data) ||
+      utils.isBlob(data)
+    ) {
+      return data;
     }
-  }
-}
+    if (utils.isArrayBufferView(data)) {
+      return data.buffer;
+    }
+    if (utils.isURLSearchParams(data)) {
+      setContentTypeIfUnset(headers, 'application/x-www-form-urlencoded;charset=utf-8');
+      return data.toString();
+    }
+    if (utils.isObject(data)) {
+      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
+      return JSON.stringify(data);
+    }
+    return data;
+  }],
 
-/**
- * Decorate the Sharp prototype with colour-related functions.
- * @private
- */
-module.exports = function (Sharp) {
-  Object.assign(Sharp.prototype, {
-    // Public
-    tint,
-    greyscale,
-    grayscale,
-    toColourspace,
-    toColorspace,
-    // Private
-    _setBackgroundColourOption
-  });
-  // Class attributes
-  Sharp.colourspace = colourspace;
-  Sharp.colorspace = colourspace;
+  transformResponse: [function transformResponse(data) {
+    /*eslint no-param-reassign:0*/
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) { /* Ignore */ }
+    }
+    return data;
+  }],
+
+  /**
+   * A timeout in milliseconds to abort a request. If set to 0 (default) a
+   * timeout is not created.
+   */
+  timeout: 0,
+
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+
+  maxContentLength: -1,
+  maxBodyLength: -1,
+
+  validateStatus: function validateStatus(status) {
+    return status >= 200 && status < 300;
+  }
 };
+
+defaults.headers = {
+  common: {
+    'Accept': 'application/json, text/plain, */*'
+  }
+};
+
+utils.forEach(['delete', 'get', 'head'], function forEachMethodNoData(method) {
+  defaults.headers[method] = {};
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  defaults.headers[method] = utils.merge(DEFAULT_CONTENT_TYPE);
+});
+
+module.exports = defaults;
 
 
 /***/ }),
-/* 89 */,
-/* 90 */,
-/* 91 */,
-/* 92 */
+
+/***/ 87:
+/***/ (function(module) {
+
+module.exports = require("os");
+
+/***/ }),
+
+/***/ 92:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -9180,10 +6764,8 @@ function escapeProperty(s) {
 //# sourceMappingURL=command.js.map
 
 /***/ }),
-/* 93 */,
-/* 94 */,
-/* 95 */,
-/* 96 */
+
+/***/ 96:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -9216,110 +6798,8 @@ module.exports = {
 
 
 /***/ }),
-/* 97 */,
-/* 98 */,
-/* 99 */,
-/* 100 */,
-/* 101 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-
-var platform = __webpack_require__(87).platform();
-var spawnSync = __webpack_require__(4).spawnSync;
-var readdirSync = __webpack_require__(747).readdirSync;
-
-var GLIBC = 'glibc';
-var MUSL = 'musl';
-
-var spawnOptions = {
-  encoding: 'utf8',
-  env: process.env
-};
-
-if (!spawnSync) {
-  spawnSync = function () {
-    return { status: 126, stdout: '', stderr: '' };
-  };
-}
-
-function contains (needle) {
-  return function (haystack) {
-    return haystack.indexOf(needle) !== -1;
-  };
-}
-
-function versionFromMuslLdd (out) {
-  return out.split(/[\r\n]+/)[1].trim().split(/\s/)[1];
-}
-
-function safeReaddirSync (path) {
-  try {
-    return readdirSync(path);
-  } catch (e) {}
-  return [];
-}
-
-var family = '';
-var version = '';
-var method = '';
-
-if (platform === 'linux') {
-  // Try getconf
-  var glibc = spawnSync('getconf', ['GNU_LIBC_VERSION'], spawnOptions);
-  if (glibc.status === 0) {
-    family = GLIBC;
-    version = glibc.stdout.trim().split(' ')[1];
-    method = 'getconf';
-  } else {
-    // Try ldd
-    var ldd = spawnSync('ldd', ['--version'], spawnOptions);
-    if (ldd.status === 0 && ldd.stdout.indexOf(MUSL) !== -1) {
-      family = MUSL;
-      version = versionFromMuslLdd(ldd.stdout);
-      method = 'ldd';
-    } else if (ldd.status === 1 && ldd.stderr.indexOf(MUSL) !== -1) {
-      family = MUSL;
-      version = versionFromMuslLdd(ldd.stderr);
-      method = 'ldd';
-    } else {
-      // Try filesystem (family only)
-      var lib = safeReaddirSync('/lib');
-      if (lib.some(contains('-linux-gnu'))) {
-        family = GLIBC;
-        method = 'filesystem';
-      } else if (lib.some(contains('libc.musl-'))) {
-        family = MUSL;
-        method = 'filesystem';
-      } else if (lib.some(contains('ld-musl-'))) {
-        family = MUSL;
-        method = 'filesystem';
-      } else {
-        var usrSbin = safeReaddirSync('/usr/sbin');
-        if (usrSbin.some(contains('glibc'))) {
-          family = GLIBC;
-          method = 'filesystem';
-        }
-      }
-    }
-  }
-}
-
-var isNonGlibcLinux = (family !== '' && family !== GLIBC);
-
-module.exports = {
-  GLIBC: GLIBC,
-  MUSL: MUSL,
-  family: family,
-  version: version,
-  method: method,
-  isNonGlibcLinux: isNonGlibcLinux
-};
-
-
-/***/ }),
-/* 102 */
+/***/ 102:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -9328,7 +6808,7 @@ module.exports = {
 
 var zlib_inflate = __webpack_require__(326);
 var utils        = __webpack_require__(33);
-var strings      = __webpack_require__(159);
+var strings      = __webpack_require__(852);
 var c            = __webpack_require__(187);
 var msg          = __webpack_require__(294);
 var ZStream      = __webpack_require__(665);
@@ -9749,444 +7229,8 @@ exports.ungzip  = inflate;
 
 
 /***/ }),
-/* 103 */,
-/* 104 */,
-/* 105 */,
-/* 106 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-module.exports = Yallist
-
-Yallist.Node = Node
-Yallist.create = Yallist
-
-function Yallist (list) {
-  var self = this
-  if (!(self instanceof Yallist)) {
-    self = new Yallist()
-  }
-
-  self.tail = null
-  self.head = null
-  self.length = 0
-
-  if (list && typeof list.forEach === 'function') {
-    list.forEach(function (item) {
-      self.push(item)
-    })
-  } else if (arguments.length > 0) {
-    for (var i = 0, l = arguments.length; i < l; i++) {
-      self.push(arguments[i])
-    }
-  }
-
-  return self
-}
-
-Yallist.prototype.removeNode = function (node) {
-  if (node.list !== this) {
-    throw new Error('removing node which does not belong to this list')
-  }
-
-  var next = node.next
-  var prev = node.prev
-
-  if (next) {
-    next.prev = prev
-  }
-
-  if (prev) {
-    prev.next = next
-  }
-
-  if (node === this.head) {
-    this.head = next
-  }
-  if (node === this.tail) {
-    this.tail = prev
-  }
-
-  node.list.length--
-  node.next = null
-  node.prev = null
-  node.list = null
-
-  return next
-}
-
-Yallist.prototype.unshiftNode = function (node) {
-  if (node === this.head) {
-    return
-  }
-
-  if (node.list) {
-    node.list.removeNode(node)
-  }
-
-  var head = this.head
-  node.list = this
-  node.next = head
-  if (head) {
-    head.prev = node
-  }
-
-  this.head = node
-  if (!this.tail) {
-    this.tail = node
-  }
-  this.length++
-}
-
-Yallist.prototype.pushNode = function (node) {
-  if (node === this.tail) {
-    return
-  }
-
-  if (node.list) {
-    node.list.removeNode(node)
-  }
-
-  var tail = this.tail
-  node.list = this
-  node.prev = tail
-  if (tail) {
-    tail.next = node
-  }
-
-  this.tail = node
-  if (!this.head) {
-    this.head = node
-  }
-  this.length++
-}
-
-Yallist.prototype.push = function () {
-  for (var i = 0, l = arguments.length; i < l; i++) {
-    push(this, arguments[i])
-  }
-  return this.length
-}
-
-Yallist.prototype.unshift = function () {
-  for (var i = 0, l = arguments.length; i < l; i++) {
-    unshift(this, arguments[i])
-  }
-  return this.length
-}
-
-Yallist.prototype.pop = function () {
-  if (!this.tail) {
-    return undefined
-  }
-
-  var res = this.tail.value
-  this.tail = this.tail.prev
-  if (this.tail) {
-    this.tail.next = null
-  } else {
-    this.head = null
-  }
-  this.length--
-  return res
-}
-
-Yallist.prototype.shift = function () {
-  if (!this.head) {
-    return undefined
-  }
-
-  var res = this.head.value
-  this.head = this.head.next
-  if (this.head) {
-    this.head.prev = null
-  } else {
-    this.tail = null
-  }
-  this.length--
-  return res
-}
-
-Yallist.prototype.forEach = function (fn, thisp) {
-  thisp = thisp || this
-  for (var walker = this.head, i = 0; walker !== null; i++) {
-    fn.call(thisp, walker.value, i, this)
-    walker = walker.next
-  }
-}
-
-Yallist.prototype.forEachReverse = function (fn, thisp) {
-  thisp = thisp || this
-  for (var walker = this.tail, i = this.length - 1; walker !== null; i--) {
-    fn.call(thisp, walker.value, i, this)
-    walker = walker.prev
-  }
-}
-
-Yallist.prototype.get = function (n) {
-  for (var i = 0, walker = this.head; walker !== null && i < n; i++) {
-    // abort out of the list early if we hit a cycle
-    walker = walker.next
-  }
-  if (i === n && walker !== null) {
-    return walker.value
-  }
-}
-
-Yallist.prototype.getReverse = function (n) {
-  for (var i = 0, walker = this.tail; walker !== null && i < n; i++) {
-    // abort out of the list early if we hit a cycle
-    walker = walker.prev
-  }
-  if (i === n && walker !== null) {
-    return walker.value
-  }
-}
-
-Yallist.prototype.map = function (fn, thisp) {
-  thisp = thisp || this
-  var res = new Yallist()
-  for (var walker = this.head; walker !== null;) {
-    res.push(fn.call(thisp, walker.value, this))
-    walker = walker.next
-  }
-  return res
-}
-
-Yallist.prototype.mapReverse = function (fn, thisp) {
-  thisp = thisp || this
-  var res = new Yallist()
-  for (var walker = this.tail; walker !== null;) {
-    res.push(fn.call(thisp, walker.value, this))
-    walker = walker.prev
-  }
-  return res
-}
-
-Yallist.prototype.reduce = function (fn, initial) {
-  var acc
-  var walker = this.head
-  if (arguments.length > 1) {
-    acc = initial
-  } else if (this.head) {
-    walker = this.head.next
-    acc = this.head.value
-  } else {
-    throw new TypeError('Reduce of empty list with no initial value')
-  }
-
-  for (var i = 0; walker !== null; i++) {
-    acc = fn(acc, walker.value, i)
-    walker = walker.next
-  }
-
-  return acc
-}
-
-Yallist.prototype.reduceReverse = function (fn, initial) {
-  var acc
-  var walker = this.tail
-  if (arguments.length > 1) {
-    acc = initial
-  } else if (this.tail) {
-    walker = this.tail.prev
-    acc = this.tail.value
-  } else {
-    throw new TypeError('Reduce of empty list with no initial value')
-  }
-
-  for (var i = this.length - 1; walker !== null; i--) {
-    acc = fn(acc, walker.value, i)
-    walker = walker.prev
-  }
-
-  return acc
-}
-
-Yallist.prototype.toArray = function () {
-  var arr = new Array(this.length)
-  for (var i = 0, walker = this.head; walker !== null; i++) {
-    arr[i] = walker.value
-    walker = walker.next
-  }
-  return arr
-}
-
-Yallist.prototype.toArrayReverse = function () {
-  var arr = new Array(this.length)
-  for (var i = 0, walker = this.tail; walker !== null; i++) {
-    arr[i] = walker.value
-    walker = walker.prev
-  }
-  return arr
-}
-
-Yallist.prototype.slice = function (from, to) {
-  to = to || this.length
-  if (to < 0) {
-    to += this.length
-  }
-  from = from || 0
-  if (from < 0) {
-    from += this.length
-  }
-  var ret = new Yallist()
-  if (to < from || to < 0) {
-    return ret
-  }
-  if (from < 0) {
-    from = 0
-  }
-  if (to > this.length) {
-    to = this.length
-  }
-  for (var i = 0, walker = this.head; walker !== null && i < from; i++) {
-    walker = walker.next
-  }
-  for (; walker !== null && i < to; i++, walker = walker.next) {
-    ret.push(walker.value)
-  }
-  return ret
-}
-
-Yallist.prototype.sliceReverse = function (from, to) {
-  to = to || this.length
-  if (to < 0) {
-    to += this.length
-  }
-  from = from || 0
-  if (from < 0) {
-    from += this.length
-  }
-  var ret = new Yallist()
-  if (to < from || to < 0) {
-    return ret
-  }
-  if (from < 0) {
-    from = 0
-  }
-  if (to > this.length) {
-    to = this.length
-  }
-  for (var i = this.length, walker = this.tail; walker !== null && i > to; i--) {
-    walker = walker.prev
-  }
-  for (; walker !== null && i > from; i--, walker = walker.prev) {
-    ret.push(walker.value)
-  }
-  return ret
-}
-
-Yallist.prototype.splice = function (start, deleteCount, ...nodes) {
-  if (start > this.length) {
-    start = this.length - 1
-  }
-  if (start < 0) {
-    start = this.length + start;
-  }
-
-  for (var i = 0, walker = this.head; walker !== null && i < start; i++) {
-    walker = walker.next
-  }
-
-  var ret = []
-  for (var i = 0; walker && i < deleteCount; i++) {
-    ret.push(walker.value)
-    walker = this.removeNode(walker)
-  }
-  if (walker === null) {
-    walker = this.tail
-  }
-
-  if (walker !== this.head && walker !== this.tail) {
-    walker = walker.prev
-  }
-
-  for (var i = 0; i < nodes.length; i++) {
-    walker = insert(this, walker, nodes[i])
-  }
-  return ret;
-}
-
-Yallist.prototype.reverse = function () {
-  var head = this.head
-  var tail = this.tail
-  for (var walker = head; walker !== null; walker = walker.prev) {
-    var p = walker.prev
-    walker.prev = walker.next
-    walker.next = p
-  }
-  this.head = tail
-  this.tail = head
-  return this
-}
-
-function insert (self, node, value) {
-  var inserted = node === self.head ?
-    new Node(value, null, node, self) :
-    new Node(value, node, node.next, self)
-
-  if (inserted.next === null) {
-    self.tail = inserted
-  }
-  if (inserted.prev === null) {
-    self.head = inserted
-  }
-
-  self.length++
-
-  return inserted
-}
-
-function push (self, item) {
-  self.tail = new Node(item, self.tail, null, self)
-  if (!self.head) {
-    self.head = self.tail
-  }
-  self.length++
-}
-
-function unshift (self, item) {
-  self.head = new Node(item, null, self.head, self)
-  if (!self.tail) {
-    self.tail = self.head
-  }
-  self.length++
-}
-
-function Node (value, prev, next, list) {
-  if (!(this instanceof Node)) {
-    return new Node(value, prev, next, list)
-  }
-
-  this.list = list
-  this.value = value
-
-  if (prev) {
-    prev.next = this
-    this.prev = prev
-  } else {
-    this.prev = null
-  }
-
-  if (next) {
-    next.prev = this
-    this.next = next
-  } else {
-    this.next = null
-  }
-}
-
-try {
-  // add if support for Symbol.iterator is present
-  __webpack_require__(463)(Yallist)
-} catch (er) {}
-
-
-/***/ }),
-/* 107 */,
-/* 108 */
+/***/ 108:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -10212,33 +7256,8 @@ module.exports = NodeBufferReader;
 
 
 /***/ }),
-/* 109 */,
-/* 110 */,
-/* 111 */,
-/* 112 */,
-/* 113 */,
-/* 114 */,
-/* 115 */,
-/* 116 */,
-/* 117 */,
-/* 118 */,
-/* 119 */,
-/* 120 */,
-/* 121 */,
-/* 122 */,
-/* 123 */,
-/* 124 */,
-/* 125 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const compare = __webpack_require__(233)
-const lte = (a, b, loose) => compare(a, b, loose) <= 0
-module.exports = lte
-
-
-/***/ }),
-/* 126 */,
-/* 127 */
+/***/ 127:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -10297,8 +7316,8 @@ module.exports = InterceptorManager;
 
 
 /***/ }),
-/* 128 */,
-/* 129 */
+
+/***/ 129:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -10366,21 +7385,8 @@ module.exports = {
 
 
 /***/ }),
-/* 130 */,
-/* 131 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const parse = __webpack_require__(621)
-const clean = (version, options) => {
-  const s = parse(version.trim().replace(/^[=v]+/, ''), options)
-  return s ? s.version : null
-}
-module.exports = clean
-
-
-/***/ }),
-/* 132 */,
-/* 133 */
+/***/ 133:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -10396,32 +7402,8 @@ module.exports = {
 
 
 /***/ }),
-/* 134 */,
-/* 135 */,
-/* 136 */,
-/* 137 */,
-/* 138 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const SemVer = __webpack_require__(82)
-
-const inc = (version, release, options, identifier) => {
-  if (typeof (options) === 'string') {
-    identifier = options
-    options = undefined
-  }
-
-  try {
-    return new SemVer(version, options).inc(release, identifier).version
-  } catch (er) {
-    return null
-  }
-}
-module.exports = inc
-
-
-/***/ }),
-/* 139 */
+/***/ 139:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -10506,18 +7488,8 @@ if (util && util.inspect && util.inspect.custom) {
 }
 
 /***/ }),
-/* 140 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const compare = __webpack_require__(233)
-const gte = (a, b, loose) => compare(a, b, loose) >= 0
-module.exports = gte
-
-
-/***/ }),
-/* 141 */,
-/* 142 */,
-/* 143 */
+/***/ 143:
 /***/ (function(module) {
 
 "use strict";
@@ -10538,77 +7510,23 @@ module.exports = function combineURLs(baseURL, relativeURL) {
 
 
 /***/ }),
-/* 144 */,
-/* 145 */,
-/* 146 */,
-/* 147 */,
-/* 148 */,
-/* 149 */,
-/* 150 */
-/***/ (function(module) {
 
-module.exports = {"aom":"3.0.0","cairo":"1.17.4","exif":"0.6.22","expat":"2.3.0","ffi":"3.3","fontconfig":"2.13.93","freetype":"2.10.4","fribidi":"1.0.10","gdkpixbuf":"2.42.4","gettext":"0.21","gif":"5.1.4","glib":"2.68.0","gsf":"1.14.47","harfbuzz":"2.8.0","heif":"1.11.0","imagequant":"2.4.1","lcms":"2.12","mozjpeg":"4.0.3","orc":"0.4.32","pango":"1.48.3","pixman":"0.40.0","png":"1.6.37","svg":"2.51.0","spng":"0.6.2","tiff":"4.2.0","vips":"8.10.6","webp":"1.2.0","xml":"2.9.10","zlib-ng":"2.0.2"};
+/***/ 150:
+/***/ (function(__unusedmodule, exports) {
 
-/***/ }),
-/* 151 */,
-/* 152 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+"use strict";
 
-const compareBuild = __webpack_require__(185)
-const sort = (list, loose) => list.sort((a, b) => compareBuild(a, b, loose))
-module.exports = sort
+exports.LOCAL_FILE_HEADER = "PK\x03\x04";
+exports.CENTRAL_FILE_HEADER = "PK\x01\x02";
+exports.CENTRAL_DIRECTORY_END = "PK\x05\x06";
+exports.ZIP64_CENTRAL_DIRECTORY_LOCATOR = "PK\x06\x07";
+exports.ZIP64_CENTRAL_DIRECTORY_END = "PK\x06\x06";
+exports.DATA_DESCRIPTOR = "PK\x07\x08";
 
 
 /***/ }),
-/* 153 */
-/***/ (function(module) {
 
-module.exports = function isArrayish(obj) {
-	if (!obj || typeof obj === 'string') {
-		return false;
-	}
-
-	return obj instanceof Array || Array.isArray(obj) ||
-		(obj.length >= 0 && (obj.splice instanceof Function ||
-			(Object.getOwnPropertyDescriptor(obj, (obj.length - 1)) && obj.constructor.name !== 'String')));
-};
-
-
-/***/ }),
-/* 154 */,
-/* 155 */,
-/* 156 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-const SemVer = __webpack_require__(82)
-const Range = __webpack_require__(174)
-const minSatisfying = (versions, range, options) => {
-  let min = null
-  let minSV = null
-  let rangeObj = null
-  try {
-    rangeObj = new Range(range, options)
-  } catch (er) {
-    return null
-  }
-  versions.forEach((v) => {
-    if (rangeObj.test(v)) {
-      // satisfies(v, range, options)
-      if (!min || minSV.compare(v) === 1) {
-        // compare(min, v, true)
-        min = v
-        minSV = new SemVer(min, options)
-      }
-    }
-  })
-  return min
-}
-module.exports = minSatisfying
-
-
-/***/ }),
-/* 157 */,
-/* 158 */
+/***/ 158:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -10643,201 +7561,8 @@ exports.issueCommand = issueCommand;
 //# sourceMappingURL=file-command.js.map
 
 /***/ }),
-/* 159 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-"use strict";
-// String encode/decode helpers
-
-
-
-var utils = __webpack_require__(33);
-
-
-// Quick check if we can use fast array to bin string conversion
-//
-// - apply(Array) can fail on Android 2.2
-// - apply(Uint8Array) can fail on iOS 5.1 Safari
-//
-var STR_APPLY_OK = true;
-var STR_APPLY_UIA_OK = true;
-
-try { String.fromCharCode.apply(null, [ 0 ]); } catch (__) { STR_APPLY_OK = false; }
-try { String.fromCharCode.apply(null, new Uint8Array(1)); } catch (__) { STR_APPLY_UIA_OK = false; }
-
-
-// Table with utf8 lengths (calculated by first byte of sequence)
-// Note, that 5 & 6-byte values and some 4-byte values can not be represented in JS,
-// because max possible codepoint is 0x10ffff
-var _utf8len = new utils.Buf8(256);
-for (var q = 0; q < 256; q++) {
-  _utf8len[q] = (q >= 252 ? 6 : q >= 248 ? 5 : q >= 240 ? 4 : q >= 224 ? 3 : q >= 192 ? 2 : 1);
-}
-_utf8len[254] = _utf8len[254] = 1; // Invalid sequence start
-
-
-// convert string to array (typed, when possible)
-exports.string2buf = function (str) {
-  var buf, c, c2, m_pos, i, str_len = str.length, buf_len = 0;
-
-  // count binary size
-  for (m_pos = 0; m_pos < str_len; m_pos++) {
-    c = str.charCodeAt(m_pos);
-    if ((c & 0xfc00) === 0xd800 && (m_pos + 1 < str_len)) {
-      c2 = str.charCodeAt(m_pos + 1);
-      if ((c2 & 0xfc00) === 0xdc00) {
-        c = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
-        m_pos++;
-      }
-    }
-    buf_len += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
-  }
-
-  // allocate buffer
-  buf = new utils.Buf8(buf_len);
-
-  // convert
-  for (i = 0, m_pos = 0; i < buf_len; m_pos++) {
-    c = str.charCodeAt(m_pos);
-    if ((c & 0xfc00) === 0xd800 && (m_pos + 1 < str_len)) {
-      c2 = str.charCodeAt(m_pos + 1);
-      if ((c2 & 0xfc00) === 0xdc00) {
-        c = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
-        m_pos++;
-      }
-    }
-    if (c < 0x80) {
-      /* one byte */
-      buf[i++] = c;
-    } else if (c < 0x800) {
-      /* two bytes */
-      buf[i++] = 0xC0 | (c >>> 6);
-      buf[i++] = 0x80 | (c & 0x3f);
-    } else if (c < 0x10000) {
-      /* three bytes */
-      buf[i++] = 0xE0 | (c >>> 12);
-      buf[i++] = 0x80 | (c >>> 6 & 0x3f);
-      buf[i++] = 0x80 | (c & 0x3f);
-    } else {
-      /* four bytes */
-      buf[i++] = 0xf0 | (c >>> 18);
-      buf[i++] = 0x80 | (c >>> 12 & 0x3f);
-      buf[i++] = 0x80 | (c >>> 6 & 0x3f);
-      buf[i++] = 0x80 | (c & 0x3f);
-    }
-  }
-
-  return buf;
-};
-
-// Helper (used in 2 places)
-function buf2binstring(buf, len) {
-  // On Chrome, the arguments in a function call that are allowed is `65534`.
-  // If the length of the buffer is smaller than that, we can use this optimization,
-  // otherwise we will take a slower path.
-  if (len < 65534) {
-    if ((buf.subarray && STR_APPLY_UIA_OK) || (!buf.subarray && STR_APPLY_OK)) {
-      return String.fromCharCode.apply(null, utils.shrinkBuf(buf, len));
-    }
-  }
-
-  var result = '';
-  for (var i = 0; i < len; i++) {
-    result += String.fromCharCode(buf[i]);
-  }
-  return result;
-}
-
-
-// Convert byte array to binary string
-exports.buf2binstring = function (buf) {
-  return buf2binstring(buf, buf.length);
-};
-
-
-// Convert binary string (typed, when possible)
-exports.binstring2buf = function (str) {
-  var buf = new utils.Buf8(str.length);
-  for (var i = 0, len = buf.length; i < len; i++) {
-    buf[i] = str.charCodeAt(i);
-  }
-  return buf;
-};
-
-
-// convert array to string
-exports.buf2string = function (buf, max) {
-  var i, out, c, c_len;
-  var len = max || buf.length;
-
-  // Reserve max possible length (2 words per char)
-  // NB: by unknown reasons, Array is significantly faster for
-  //     String.fromCharCode.apply than Uint16Array.
-  var utf16buf = new Array(len * 2);
-
-  for (out = 0, i = 0; i < len;) {
-    c = buf[i++];
-    // quick process ascii
-    if (c < 0x80) { utf16buf[out++] = c; continue; }
-
-    c_len = _utf8len[c];
-    // skip 5 & 6 byte codes
-    if (c_len > 4) { utf16buf[out++] = 0xfffd; i += c_len - 1; continue; }
-
-    // apply mask on first byte
-    c &= c_len === 2 ? 0x1f : c_len === 3 ? 0x0f : 0x07;
-    // join the rest
-    while (c_len > 1 && i < len) {
-      c = (c << 6) | (buf[i++] & 0x3f);
-      c_len--;
-    }
-
-    // terminated by end of string?
-    if (c_len > 1) { utf16buf[out++] = 0xfffd; continue; }
-
-    if (c < 0x10000) {
-      utf16buf[out++] = c;
-    } else {
-      c -= 0x10000;
-      utf16buf[out++] = 0xd800 | ((c >> 10) & 0x3ff);
-      utf16buf[out++] = 0xdc00 | (c & 0x3ff);
-    }
-  }
-
-  return buf2binstring(utf16buf, out);
-};
-
-
-// Calculate max possible position in utf8 buffer,
-// that will not break sequence. If that's not possible
-// - (very small limits) return max size as is.
-//
-// buf[] - utf8 bytes array
-// max   - length limit (mandatory);
-exports.utf8border = function (buf, max) {
-  var pos;
-
-  max = max || buf.length;
-  if (max > buf.length) { max = buf.length; }
-
-  // go back from last position, until start of sequence found
-  pos = max - 1;
-  while (pos >= 0 && (buf[pos] & 0xC0) === 0x80) { pos--; }
-
-  // Very small and broken sequence,
-  // return max, because we should return something anyway.
-  if (pos < 0) { return max; }
-
-  // If we came to start of buffer - that means buffer is too small,
-  // return max too.
-  if (pos === 0) { return max; }
-
-  return (pos + _utf8len[buf[pos]] > max) ? pos : max;
-};
-
-
-/***/ }),
-/* 160 */
+/***/ 160:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -10882,123 +7607,8 @@ module.exports = StringReader;
 
 
 /***/ }),
-/* 161 */,
-/* 162 */,
-/* 163 */,
-/* 164 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-
-var utils = __webpack_require__(318);
-var normalizeHeaderName = __webpack_require__(575);
-
-var DEFAULT_CONTENT_TYPE = {
-  'Content-Type': 'application/x-www-form-urlencoded'
-};
-
-function setContentTypeIfUnset(headers, value) {
-  if (!utils.isUndefined(headers) && utils.isUndefined(headers['Content-Type'])) {
-    headers['Content-Type'] = value;
-  }
-}
-
-function getDefaultAdapter() {
-  var adapter;
-  if (typeof XMLHttpRequest !== 'undefined') {
-    // For browsers use XHR adapter
-    adapter = __webpack_require__(943);
-  } else if (typeof process !== 'undefined' && Object.prototype.toString.call(process) === '[object process]') {
-    // For node use HTTP adapter
-    adapter = __webpack_require__(930);
-  }
-  return adapter;
-}
-
-var defaults = {
-  adapter: getDefaultAdapter(),
-
-  transformRequest: [function transformRequest(data, headers) {
-    normalizeHeaderName(headers, 'Accept');
-    normalizeHeaderName(headers, 'Content-Type');
-    if (utils.isFormData(data) ||
-      utils.isArrayBuffer(data) ||
-      utils.isBuffer(data) ||
-      utils.isStream(data) ||
-      utils.isFile(data) ||
-      utils.isBlob(data)
-    ) {
-      return data;
-    }
-    if (utils.isArrayBufferView(data)) {
-      return data.buffer;
-    }
-    if (utils.isURLSearchParams(data)) {
-      setContentTypeIfUnset(headers, 'application/x-www-form-urlencoded;charset=utf-8');
-      return data.toString();
-    }
-    if (utils.isObject(data)) {
-      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
-      return JSON.stringify(data);
-    }
-    return data;
-  }],
-
-  transformResponse: [function transformResponse(data) {
-    /*eslint no-param-reassign:0*/
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data);
-      } catch (e) { /* Ignore */ }
-    }
-    return data;
-  }],
-
-  /**
-   * A timeout in milliseconds to abort a request. If set to 0 (default) a
-   * timeout is not created.
-   */
-  timeout: 0,
-
-  xsrfCookieName: 'XSRF-TOKEN',
-  xsrfHeaderName: 'X-XSRF-TOKEN',
-
-  maxContentLength: -1,
-  maxBodyLength: -1,
-
-  validateStatus: function validateStatus(status) {
-    return status >= 200 && status < 300;
-  }
-};
-
-defaults.headers = {
-  common: {
-    'Accept': 'application/json, text/plain, */*'
-  }
-};
-
-utils.forEach(['delete', 'get', 'head'], function forEachMethodNoData(method) {
-  defaults.headers[method] = {};
-});
-
-utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
-  defaults.headers[method] = utils.merge(DEFAULT_CONTENT_TYPE);
-});
-
-module.exports = defaults;
-
-
-/***/ }),
-/* 165 */,
-/* 166 */,
-/* 167 */,
-/* 168 */,
-/* 169 */,
-/* 170 */,
-/* 171 */,
-/* 172 */,
-/* 173 */
+/***/ 173:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 exports.alphasort = alphasort
@@ -11244,725 +7854,540 @@ function childrenIgnored (self, path) {
 
 
 /***/ }),
-/* 174 */
+
+/***/ 174:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-// hoisted class for cyclic dependency
-class Range {
-  constructor (range, options) {
-    options = parseOptions(options)
+var url = __webpack_require__(835);
+var URL = url.URL;
+var http = __webpack_require__(605);
+var https = __webpack_require__(211);
+var Writable = __webpack_require__(413).Writable;
+var assert = __webpack_require__(59);
+var debug = __webpack_require__(456);
 
-    if (range instanceof Range) {
-      if (
-        range.loose === !!options.loose &&
-        range.includePrerelease === !!options.includePrerelease
-      ) {
-        return range
-      } else {
-        return new Range(range.raw, options)
-      }
+// Create handlers that pass events from native requests
+var eventHandlers = Object.create(null);
+["abort", "aborted", "connect", "error", "socket", "timeout"].forEach(function (event) {
+  eventHandlers[event] = function (arg1, arg2, arg3) {
+    this._redirectable.emit(event, arg1, arg2, arg3);
+  };
+});
+
+// Error types with codes
+var RedirectionError = createErrorType(
+  "ERR_FR_REDIRECTION_FAILURE",
+  ""
+);
+var TooManyRedirectsError = createErrorType(
+  "ERR_FR_TOO_MANY_REDIRECTS",
+  "Maximum number of redirects exceeded"
+);
+var MaxBodyLengthExceededError = createErrorType(
+  "ERR_FR_MAX_BODY_LENGTH_EXCEEDED",
+  "Request body larger than maxBodyLength limit"
+);
+var WriteAfterEndError = createErrorType(
+  "ERR_STREAM_WRITE_AFTER_END",
+  "write after end"
+);
+
+// An HTTP(S) request that can be redirected
+function RedirectableRequest(options, responseCallback) {
+  // Initialize the request
+  Writable.call(this);
+  this._sanitizeOptions(options);
+  this._options = options;
+  this._ended = false;
+  this._ending = false;
+  this._redirectCount = 0;
+  this._redirects = [];
+  this._requestBodyLength = 0;
+  this._requestBodyBuffers = [];
+
+  // Attach a callback if passed
+  if (responseCallback) {
+    this.on("response", responseCallback);
+  }
+
+  // React to responses of native requests
+  var self = this;
+  this._onNativeResponse = function (response) {
+    self._processResponse(response);
+  };
+
+  // Perform the first request
+  this._performRequest();
+}
+RedirectableRequest.prototype = Object.create(Writable.prototype);
+
+RedirectableRequest.prototype.abort = function () {
+  // Abort the internal request
+  this._currentRequest.removeAllListeners();
+  this._currentRequest.on("error", noop);
+  this._currentRequest.abort();
+
+  // Abort this request
+  this.emit("abort");
+  this.removeAllListeners();
+};
+
+// Writes buffered data to the current native request
+RedirectableRequest.prototype.write = function (data, encoding, callback) {
+  // Writing is not allowed if end has been called
+  if (this._ending) {
+    throw new WriteAfterEndError();
+  }
+
+  // Validate input and shift parameters if necessary
+  if (!(typeof data === "string" || typeof data === "object" && ("length" in data))) {
+    throw new TypeError("data should be a string, Buffer or Uint8Array");
+  }
+  if (typeof encoding === "function") {
+    callback = encoding;
+    encoding = null;
+  }
+
+  // Ignore empty buffers, since writing them doesn't invoke the callback
+  // https://github.com/nodejs/node/issues/22066
+  if (data.length === 0) {
+    if (callback) {
+      callback();
     }
+    return;
+  }
+  // Only write when we don't exceed the maximum body length
+  if (this._requestBodyLength + data.length <= this._options.maxBodyLength) {
+    this._requestBodyLength += data.length;
+    this._requestBodyBuffers.push({ data: data, encoding: encoding });
+    this._currentRequest.write(data, encoding, callback);
+  }
+  // Error when we exceed the maximum body length
+  else {
+    this.emit("error", new MaxBodyLengthExceededError());
+    this.abort();
+  }
+};
 
-    if (range instanceof Comparator) {
-      // just put it in the set and return
-      this.raw = range.value
-      this.set = [[range]]
-      this.format()
-      return this
+// Ends the current native request
+RedirectableRequest.prototype.end = function (data, encoding, callback) {
+  // Shift parameters if necessary
+  if (typeof data === "function") {
+    callback = data;
+    data = encoding = null;
+  }
+  else if (typeof encoding === "function") {
+    callback = encoding;
+    encoding = null;
+  }
+
+  // Write data if needed and end
+  if (!data) {
+    this._ended = this._ending = true;
+    this._currentRequest.end(null, null, callback);
+  }
+  else {
+    var self = this;
+    var currentRequest = this._currentRequest;
+    this.write(data, encoding, function () {
+      self._ended = true;
+      currentRequest.end(null, null, callback);
+    });
+    this._ending = true;
+  }
+};
+
+// Sets a header value on the current native request
+RedirectableRequest.prototype.setHeader = function (name, value) {
+  this._options.headers[name] = value;
+  this._currentRequest.setHeader(name, value);
+};
+
+// Clears a header value on the current native request
+RedirectableRequest.prototype.removeHeader = function (name) {
+  delete this._options.headers[name];
+  this._currentRequest.removeHeader(name);
+};
+
+// Global timeout for all underlying requests
+RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
+  var self = this;
+  if (callback) {
+    this.on("timeout", callback);
+  }
+
+  // Sets up a timer to trigger a timeout event
+  function startTimer() {
+    if (self._timeout) {
+      clearTimeout(self._timeout);
     }
+    self._timeout = setTimeout(function () {
+      self.emit("timeout");
+      clearTimer();
+    }, msecs);
+  }
 
-    this.options = options
-    this.loose = !!options.loose
-    this.includePrerelease = !!options.includePrerelease
-
-    // First, split based on boolean or ||
-    this.raw = range
-    this.set = range
-      .split(/\s*\|\|\s*/)
-      // map the range to a 2d array of comparators
-      .map(range => this.parseRange(range.trim()))
-      // throw out any comparator lists that are empty
-      // this generally means that it was not a valid range, which is allowed
-      // in loose mode, but will still throw if the WHOLE range is invalid.
-      .filter(c => c.length)
-
-    if (!this.set.length) {
-      throw new TypeError(`Invalid SemVer Range: ${range}`)
+  // Prevent a timeout from triggering
+  function clearTimer() {
+    clearTimeout(this._timeout);
+    if (callback) {
+      self.removeListener("timeout", callback);
     }
+    if (!this.socket) {
+      self._currentRequest.removeListener("socket", startTimer);
+    }
+  }
 
-    // if we have any that are not the null set, throw out null sets.
-    if (this.set.length > 1) {
-      // keep the first one, in case they're all null sets
-      const first = this.set[0]
-      this.set = this.set.filter(c => !isNullSet(c[0]))
-      if (this.set.length === 0)
-        this.set = [first]
-      else if (this.set.length > 1) {
-        // if we have any that are *, then the range is just *
-        for (const c of this.set) {
-          if (c.length === 1 && isAny(c[0])) {
-            this.set = [c]
-            break
+  // Start the timer when the socket is opened
+  if (this.socket) {
+    startTimer();
+  }
+  else {
+    this._currentRequest.once("socket", startTimer);
+  }
+
+  this.once("response", clearTimer);
+  this.once("error", clearTimer);
+
+  return this;
+};
+
+// Proxy all other public ClientRequest methods
+[
+  "flushHeaders", "getHeader",
+  "setNoDelay", "setSocketKeepAlive",
+].forEach(function (method) {
+  RedirectableRequest.prototype[method] = function (a, b) {
+    return this._currentRequest[method](a, b);
+  };
+});
+
+// Proxy all public ClientRequest properties
+["aborted", "connection", "socket"].forEach(function (property) {
+  Object.defineProperty(RedirectableRequest.prototype, property, {
+    get: function () { return this._currentRequest[property]; },
+  });
+});
+
+RedirectableRequest.prototype._sanitizeOptions = function (options) {
+  // Ensure headers are always present
+  if (!options.headers) {
+    options.headers = {};
+  }
+
+  // Since http.request treats host as an alias of hostname,
+  // but the url module interprets host as hostname plus port,
+  // eliminate the host property to avoid confusion.
+  if (options.host) {
+    // Use hostname if set, because it has precedence
+    if (!options.hostname) {
+      options.hostname = options.host;
+    }
+    delete options.host;
+  }
+
+  // Complete the URL object when necessary
+  if (!options.pathname && options.path) {
+    var searchPos = options.path.indexOf("?");
+    if (searchPos < 0) {
+      options.pathname = options.path;
+    }
+    else {
+      options.pathname = options.path.substring(0, searchPos);
+      options.search = options.path.substring(searchPos);
+    }
+  }
+};
+
+
+// Executes the next native request (initial or redirect)
+RedirectableRequest.prototype._performRequest = function () {
+  // Load the native protocol
+  var protocol = this._options.protocol;
+  var nativeProtocol = this._options.nativeProtocols[protocol];
+  if (!nativeProtocol) {
+    this.emit("error", new TypeError("Unsupported protocol " + protocol));
+    return;
+  }
+
+  // If specified, use the agent corresponding to the protocol
+  // (HTTP and HTTPS use different types of agents)
+  if (this._options.agents) {
+    var scheme = protocol.substr(0, protocol.length - 1);
+    this._options.agent = this._options.agents[scheme];
+  }
+
+  // Create the native request
+  var request = this._currentRequest =
+        nativeProtocol.request(this._options, this._onNativeResponse);
+  this._currentUrl = url.format(this._options);
+
+  // Set up event handlers
+  request._redirectable = this;
+  for (var event in eventHandlers) {
+    /* istanbul ignore else */
+    if (event) {
+      request.on(event, eventHandlers[event]);
+    }
+  }
+
+  // End a redirected request
+  // (The first request must be ended explicitly with RedirectableRequest#end)
+  if (this._isRedirect) {
+    // Write the request entity and end.
+    var i = 0;
+    var self = this;
+    var buffers = this._requestBodyBuffers;
+    (function writeNext(error) {
+      // Only write if this request has not been redirected yet
+      /* istanbul ignore else */
+      if (request === self._currentRequest) {
+        // Report any write errors
+        /* istanbul ignore if */
+        if (error) {
+          self.emit("error", error);
+        }
+        // Write the next buffer if there are still left
+        else if (i < buffers.length) {
+          var buffer = buffers[i++];
+          /* istanbul ignore else */
+          if (!request.finished) {
+            request.write(buffer.data, buffer.encoding, writeNext);
           }
         }
+        // End the request if `end` has been called on us
+        else if (self._ended) {
+          request.end();
+        }
       }
+    }());
+  }
+};
+
+// Processes a response from the current native request
+RedirectableRequest.prototype._processResponse = function (response) {
+  // Store the redirected response
+  var statusCode = response.statusCode;
+  if (this._options.trackRedirects) {
+    this._redirects.push({
+      url: this._currentUrl,
+      headers: response.headers,
+      statusCode: statusCode,
+    });
+  }
+
+  // RFC7231§6.4: The 3xx (Redirection) class of status code indicates
+  // that further action needs to be taken by the user agent in order to
+  // fulfill the request. If a Location header field is provided,
+  // the user agent MAY automatically redirect its request to the URI
+  // referenced by the Location field value,
+  // even if the specific status code is not understood.
+  var location = response.headers.location;
+  if (location && this._options.followRedirects !== false &&
+      statusCode >= 300 && statusCode < 400) {
+    // Abort the current request
+    this._currentRequest.removeAllListeners();
+    this._currentRequest.on("error", noop);
+    this._currentRequest.abort();
+    // Discard the remainder of the response to avoid waiting for data
+    response.destroy();
+
+    // RFC7231§6.4: A client SHOULD detect and intervene
+    // in cyclical redirections (i.e., "infinite" redirection loops).
+    if (++this._redirectCount > this._options.maxRedirects) {
+      this.emit("error", new TooManyRedirectsError());
+      return;
     }
 
-    this.format()
-  }
-
-  format () {
-    this.range = this.set
-      .map((comps) => {
-        return comps.join(' ').trim()
-      })
-      .join('||')
-      .trim()
-    return this.range
-  }
-
-  toString () {
-    return this.range
-  }
-
-  parseRange (range) {
-    range = range.trim()
-
-    // memoize range parsing for performance.
-    // this is a very hot path, and fully deterministic.
-    const memoOpts = Object.keys(this.options).join(',')
-    const memoKey = `parseRange:${memoOpts}:${range}`
-    const cached = cache.get(memoKey)
-    if (cached)
-      return cached
-
-    const loose = this.options.loose
-    // `1.2.3 - 1.2.4` => `>=1.2.3 <=1.2.4`
-    const hr = loose ? re[t.HYPHENRANGELOOSE] : re[t.HYPHENRANGE]
-    range = range.replace(hr, hyphenReplace(this.options.includePrerelease))
-    debug('hyphen replace', range)
-    // `> 1.2.3 < 1.2.5` => `>1.2.3 <1.2.5`
-    range = range.replace(re[t.COMPARATORTRIM], comparatorTrimReplace)
-    debug('comparator trim', range, re[t.COMPARATORTRIM])
-
-    // `~ 1.2.3` => `~1.2.3`
-    range = range.replace(re[t.TILDETRIM], tildeTrimReplace)
-
-    // `^ 1.2.3` => `^1.2.3`
-    range = range.replace(re[t.CARETTRIM], caretTrimReplace)
-
-    // normalize spaces
-    range = range.split(/\s+/).join(' ')
-
-    // At this point, the range is completely trimmed and
-    // ready to be split into comparators.
-
-    const compRe = loose ? re[t.COMPARATORLOOSE] : re[t.COMPARATOR]
-    const rangeList = range
-      .split(' ')
-      .map(comp => parseComparator(comp, this.options))
-      .join(' ')
-      .split(/\s+/)
-      // >=0.0.0 is equivalent to *
-      .map(comp => replaceGTE0(comp, this.options))
-      // in loose mode, throw out any that are not valid comparators
-      .filter(this.options.loose ? comp => !!comp.match(compRe) : () => true)
-      .map(comp => new Comparator(comp, this.options))
-
-    // if any comparators are the null set, then replace with JUST null set
-    // if more than one comparator, remove any * comparators
-    // also, don't include the same comparator more than once
-    const l = rangeList.length
-    const rangeMap = new Map()
-    for (const comp of rangeList) {
-      if (isNullSet(comp))
-        return [comp]
-      rangeMap.set(comp.value, comp)
-    }
-    if (rangeMap.size > 1 && rangeMap.has(''))
-      rangeMap.delete('')
-
-    const result = [...rangeMap.values()]
-    cache.set(memoKey, result)
-    return result
-  }
-
-  intersects (range, options) {
-    if (!(range instanceof Range)) {
-      throw new TypeError('a Range is required')
+    // RFC7231§6.4: Automatic redirection needs to done with
+    // care for methods not known to be safe, […]
+    // RFC7231§6.4.2–3: For historical reasons, a user agent MAY change
+    // the request method from POST to GET for the subsequent request.
+    if ((statusCode === 301 || statusCode === 302) && this._options.method === "POST" ||
+        // RFC7231§6.4.4: The 303 (See Other) status code indicates that
+        // the server is redirecting the user agent to a different resource […]
+        // A user agent can perform a retrieval request targeting that URI
+        // (a GET or HEAD request if using HTTP) […]
+        (statusCode === 303) && !/^(?:GET|HEAD)$/.test(this._options.method)) {
+      this._options.method = "GET";
+      // Drop a possible entity and headers related to it
+      this._requestBodyBuffers = [];
+      removeMatchingHeaders(/^content-/i, this._options.headers);
     }
 
-    return this.set.some((thisComparators) => {
-      return (
-        isSatisfiable(thisComparators, options) &&
-        range.set.some((rangeComparators) => {
-          return (
-            isSatisfiable(rangeComparators, options) &&
-            thisComparators.every((thisComparator) => {
-              return rangeComparators.every((rangeComparator) => {
-                return thisComparator.intersects(rangeComparator, options)
-              })
-            })
-          )
-        })
-      )
-    })
-  }
+    // Drop the Host header, as the redirect might lead to a different host
+    var previousHostName = removeMatchingHeaders(/^host$/i, this._options.headers) ||
+      url.parse(this._currentUrl).hostname;
 
-  // if ANY of the sets match ALL of its comparators, then pass
-  test (version) {
-    if (!version) {
-      return false
+    // Create the redirected request
+    var redirectUrl = url.resolve(this._currentUrl, location);
+    debug("redirecting to", redirectUrl);
+    this._isRedirect = true;
+    var redirectUrlParts = url.parse(redirectUrl);
+    Object.assign(this._options, redirectUrlParts);
+
+    // Drop the Authorization header if redirecting to another host
+    if (redirectUrlParts.hostname !== previousHostName) {
+      removeMatchingHeaders(/^authorization$/i, this._options.headers);
     }
 
-    if (typeof version === 'string') {
+    // Evaluate the beforeRedirect callback
+    if (typeof this._options.beforeRedirect === "function") {
+      var responseDetails = { headers: response.headers };
       try {
-        version = new SemVer(version, this.options)
-      } catch (er) {
-        return false
+        this._options.beforeRedirect.call(null, this._options, responseDetails);
       }
+      catch (err) {
+        this.emit("error", err);
+        return;
+      }
+      this._sanitizeOptions(this._options);
     }
 
-    for (let i = 0; i < this.set.length; i++) {
-      if (testSet(this.set[i], version, this.options)) {
-        return true
-      }
+    // Perform the redirected request
+    try {
+      this._performRequest();
     }
-    return false
-  }
-}
-module.exports = Range
-
-const LRU = __webpack_require__(743)
-const cache = new LRU({ max: 1000 })
-
-const parseOptions = __webpack_require__(849)
-const Comparator = __webpack_require__(960)
-const debug = __webpack_require__(39)
-const SemVer = __webpack_require__(82)
-const {
-  re,
-  t,
-  comparatorTrimReplace,
-  tildeTrimReplace,
-  caretTrimReplace
-} = __webpack_require__(609)
-
-const isNullSet = c => c.value === '<0.0.0-0'
-const isAny = c => c.value === ''
-
-// take a set of comparators and determine whether there
-// exists a version which can satisfy it
-const isSatisfiable = (comparators, options) => {
-  let result = true
-  const remainingComparators = comparators.slice()
-  let testComparator = remainingComparators.pop()
-
-  while (result && remainingComparators.length) {
-    result = remainingComparators.every((otherComparator) => {
-      return testComparator.intersects(otherComparator, options)
-    })
-
-    testComparator = remainingComparators.pop()
-  }
-
-  return result
-}
-
-// comprised of xranges, tildes, stars, and gtlt's at this point.
-// already replaced the hyphen ranges
-// turn into a set of JUST comparators.
-const parseComparator = (comp, options) => {
-  debug('comp', comp, options)
-  comp = replaceCarets(comp, options)
-  debug('caret', comp)
-  comp = replaceTildes(comp, options)
-  debug('tildes', comp)
-  comp = replaceXRanges(comp, options)
-  debug('xrange', comp)
-  comp = replaceStars(comp, options)
-  debug('stars', comp)
-  return comp
-}
-
-const isX = id => !id || id.toLowerCase() === 'x' || id === '*'
-
-// ~, ~> --> * (any, kinda silly)
-// ~2, ~2.x, ~2.x.x, ~>2, ~>2.x ~>2.x.x --> >=2.0.0 <3.0.0-0
-// ~2.0, ~2.0.x, ~>2.0, ~>2.0.x --> >=2.0.0 <2.1.0-0
-// ~1.2, ~1.2.x, ~>1.2, ~>1.2.x --> >=1.2.0 <1.3.0-0
-// ~1.2.3, ~>1.2.3 --> >=1.2.3 <1.3.0-0
-// ~1.2.0, ~>1.2.0 --> >=1.2.0 <1.3.0-0
-const replaceTildes = (comp, options) =>
-  comp.trim().split(/\s+/).map((comp) => {
-    return replaceTilde(comp, options)
-  }).join(' ')
-
-const replaceTilde = (comp, options) => {
-  const r = options.loose ? re[t.TILDELOOSE] : re[t.TILDE]
-  return comp.replace(r, (_, M, m, p, pr) => {
-    debug('tilde', comp, _, M, m, p, pr)
-    let ret
-
-    if (isX(M)) {
-      ret = ''
-    } else if (isX(m)) {
-      ret = `>=${M}.0.0 <${+M + 1}.0.0-0`
-    } else if (isX(p)) {
-      // ~1.2 == >=1.2.0 <1.3.0-0
-      ret = `>=${M}.${m}.0 <${M}.${+m + 1}.0-0`
-    } else if (pr) {
-      debug('replaceTilde pr', pr)
-      ret = `>=${M}.${m}.${p}-${pr
-      } <${M}.${+m + 1}.0-0`
-    } else {
-      // ~1.2.3 == >=1.2.3 <1.3.0-0
-      ret = `>=${M}.${m}.${p
-      } <${M}.${+m + 1}.0-0`
-    }
-
-    debug('tilde return', ret)
-    return ret
-  })
-}
-
-// ^ --> * (any, kinda silly)
-// ^2, ^2.x, ^2.x.x --> >=2.0.0 <3.0.0-0
-// ^2.0, ^2.0.x --> >=2.0.0 <3.0.0-0
-// ^1.2, ^1.2.x --> >=1.2.0 <2.0.0-0
-// ^1.2.3 --> >=1.2.3 <2.0.0-0
-// ^1.2.0 --> >=1.2.0 <2.0.0-0
-const replaceCarets = (comp, options) =>
-  comp.trim().split(/\s+/).map((comp) => {
-    return replaceCaret(comp, options)
-  }).join(' ')
-
-const replaceCaret = (comp, options) => {
-  debug('caret', comp, options)
-  const r = options.loose ? re[t.CARETLOOSE] : re[t.CARET]
-  const z = options.includePrerelease ? '-0' : ''
-  return comp.replace(r, (_, M, m, p, pr) => {
-    debug('caret', comp, _, M, m, p, pr)
-    let ret
-
-    if (isX(M)) {
-      ret = ''
-    } else if (isX(m)) {
-      ret = `>=${M}.0.0${z} <${+M + 1}.0.0-0`
-    } else if (isX(p)) {
-      if (M === '0') {
-        ret = `>=${M}.${m}.0${z} <${M}.${+m + 1}.0-0`
-      } else {
-        ret = `>=${M}.${m}.0${z} <${+M + 1}.0.0-0`
-      }
-    } else if (pr) {
-      debug('replaceCaret pr', pr)
-      if (M === '0') {
-        if (m === '0') {
-          ret = `>=${M}.${m}.${p}-${pr
-          } <${M}.${m}.${+p + 1}-0`
-        } else {
-          ret = `>=${M}.${m}.${p}-${pr
-          } <${M}.${+m + 1}.0-0`
-        }
-      } else {
-        ret = `>=${M}.${m}.${p}-${pr
-        } <${+M + 1}.0.0-0`
-      }
-    } else {
-      debug('no pr')
-      if (M === '0') {
-        if (m === '0') {
-          ret = `>=${M}.${m}.${p
-          }${z} <${M}.${m}.${+p + 1}-0`
-        } else {
-          ret = `>=${M}.${m}.${p
-          }${z} <${M}.${+m + 1}.0-0`
-        }
-      } else {
-        ret = `>=${M}.${m}.${p
-        } <${+M + 1}.0.0-0`
-      }
-    }
-
-    debug('caret return', ret)
-    return ret
-  })
-}
-
-const replaceXRanges = (comp, options) => {
-  debug('replaceXRanges', comp, options)
-  return comp.split(/\s+/).map((comp) => {
-    return replaceXRange(comp, options)
-  }).join(' ')
-}
-
-const replaceXRange = (comp, options) => {
-  comp = comp.trim()
-  const r = options.loose ? re[t.XRANGELOOSE] : re[t.XRANGE]
-  return comp.replace(r, (ret, gtlt, M, m, p, pr) => {
-    debug('xRange', comp, ret, gtlt, M, m, p, pr)
-    const xM = isX(M)
-    const xm = xM || isX(m)
-    const xp = xm || isX(p)
-    const anyX = xp
-
-    if (gtlt === '=' && anyX) {
-      gtlt = ''
-    }
-
-    // if we're including prereleases in the match, then we need
-    // to fix this to -0, the lowest possible prerelease value
-    pr = options.includePrerelease ? '-0' : ''
-
-    if (xM) {
-      if (gtlt === '>' || gtlt === '<') {
-        // nothing is allowed
-        ret = '<0.0.0-0'
-      } else {
-        // nothing is forbidden
-        ret = '*'
-      }
-    } else if (gtlt && anyX) {
-      // we know patch is an x, because we have any x at all.
-      // replace X with 0
-      if (xm) {
-        m = 0
-      }
-      p = 0
-
-      if (gtlt === '>') {
-        // >1 => >=2.0.0
-        // >1.2 => >=1.3.0
-        gtlt = '>='
-        if (xm) {
-          M = +M + 1
-          m = 0
-          p = 0
-        } else {
-          m = +m + 1
-          p = 0
-        }
-      } else if (gtlt === '<=') {
-        // <=0.7.x is actually <0.8.0, since any 0.7.x should
-        // pass.  Similarly, <=7.x is actually <8.0.0, etc.
-        gtlt = '<'
-        if (xm) {
-          M = +M + 1
-        } else {
-          m = +m + 1
-        }
-      }
-
-      if (gtlt === '<')
-        pr = '-0'
-
-      ret = `${gtlt + M}.${m}.${p}${pr}`
-    } else if (xm) {
-      ret = `>=${M}.0.0${pr} <${+M + 1}.0.0-0`
-    } else if (xp) {
-      ret = `>=${M}.${m}.0${pr
-      } <${M}.${+m + 1}.0-0`
-    }
-
-    debug('xRange return', ret)
-
-    return ret
-  })
-}
-
-// Because * is AND-ed with everything else in the comparator,
-// and '' means "any version", just remove the *s entirely.
-const replaceStars = (comp, options) => {
-  debug('replaceStars', comp, options)
-  // Looseness is ignored here.  star is always as loose as it gets!
-  return comp.trim().replace(re[t.STAR], '')
-}
-
-const replaceGTE0 = (comp, options) => {
-  debug('replaceGTE0', comp, options)
-  return comp.trim()
-    .replace(re[options.includePrerelease ? t.GTE0PRE : t.GTE0], '')
-}
-
-// This function is passed to string.replace(re[t.HYPHENRANGE])
-// M, m, patch, prerelease, build
-// 1.2 - 3.4.5 => >=1.2.0 <=3.4.5
-// 1.2.3 - 3.4 => >=1.2.0 <3.5.0-0 Any 3.4.x will do
-// 1.2 - 3.4 => >=1.2.0 <3.5.0-0
-const hyphenReplace = incPr => ($0,
-  from, fM, fm, fp, fpr, fb,
-  to, tM, tm, tp, tpr, tb) => {
-  if (isX(fM)) {
-    from = ''
-  } else if (isX(fm)) {
-    from = `>=${fM}.0.0${incPr ? '-0' : ''}`
-  } else if (isX(fp)) {
-    from = `>=${fM}.${fm}.0${incPr ? '-0' : ''}`
-  } else if (fpr) {
-    from = `>=${from}`
-  } else {
-    from = `>=${from}${incPr ? '-0' : ''}`
-  }
-
-  if (isX(tM)) {
-    to = ''
-  } else if (isX(tm)) {
-    to = `<${+tM + 1}.0.0-0`
-  } else if (isX(tp)) {
-    to = `<${tM}.${+tm + 1}.0-0`
-  } else if (tpr) {
-    to = `<=${tM}.${tm}.${tp}-${tpr}`
-  } else if (incPr) {
-    to = `<${tM}.${tm}.${+tp + 1}-0`
-  } else {
-    to = `<=${to}`
-  }
-
-  return (`${from} ${to}`).trim()
-}
-
-const testSet = (set, version, options) => {
-  for (let i = 0; i < set.length; i++) {
-    if (!set[i].test(version)) {
-      return false
+    catch (cause) {
+      var error = new RedirectionError("Redirected request failed: " + cause.message);
+      error.cause = cause;
+      this.emit("error", error);
     }
   }
+  else {
+    // The response is not a redirect; return it as-is
+    response.responseUrl = this._currentUrl;
+    response.redirects = this._redirects;
+    this.emit("response", response);
 
-  if (version.prerelease.length && !options.includePrerelease) {
-    // Find the set of versions that are allowed to have prereleases
-    // For example, ^1.2.3-pr.1 desugars to >=1.2.3-pr.1 <2.0.0
-    // That should allow `1.2.3-pr.2` to pass.
-    // However, `1.2.4-alpha.notready` should NOT be allowed,
-    // even though it's within the range set by the comparators.
-    for (let i = 0; i < set.length; i++) {
-      debug(set[i].semver)
-      if (set[i].semver === Comparator.ANY) {
-        continue
-      }
-
-      if (set[i].semver.prerelease.length > 0) {
-        const allowed = set[i].semver
-        if (allowed.major === version.major &&
-            allowed.minor === version.minor &&
-            allowed.patch === version.patch) {
-          return true
-        }
-      }
-    }
-
-    // Version has a -pre, but it's not one of the ones we like.
-    return false
+    // Clean up
+    this._requestBodyBuffers = [];
   }
-
-  return true
-}
-
-
-/***/ }),
-/* 175 */,
-/* 176 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const is = __webpack_require__(64);
-
-/**
- * Boolean operations for bandbool.
- * @private
- */
-const bool = {
-  and: 'and',
-  or: 'or',
-  eor: 'eor'
 };
 
-/**
- * Remove alpha channel, if any. This is a no-op if the image does not have an alpha channel.
- *
- * @example
- * sharp('rgba.png')
- *   .removeAlpha()
- *   .toFile('rgb.png', function(err, info) {
- *     // rgb.png is a 3 channel image without an alpha channel
- *   });
- *
- * @returns {Sharp}
- */
-function removeAlpha () {
-  this.options.removeAlpha = true;
-  return this;
-}
+// Wraps the key/value object of protocols with redirect functionality
+function wrap(protocols) {
+  // Default settings
+  var exports = {
+    maxRedirects: 21,
+    maxBodyLength: 10 * 1024 * 1024,
+  };
 
-/**
- * Ensure the output image has an alpha transparency channel.
- * If missing, the added alpha channel will have the specified
- * transparency level, defaulting to fully-opaque (1).
- * This is a no-op if the image already has an alpha channel.
- *
- * @since 0.21.2
- *
- * @example
- * // rgba.png will be a 4 channel image with a fully-opaque alpha channel
- * await sharp('rgb.jpg')
- *   .ensureAlpha()
- *   .toFile('rgba.png')
- *
- * @example
- * // rgba is a 4 channel image with a fully-transparent alpha channel
- * const rgba = await sharp(rgb)
- *   .ensureAlpha(0)
- *   .toBuffer();
- *
- * @param {number} [alpha=1] - alpha transparency level (0=fully-transparent, 1=fully-opaque)
- * @returns {Sharp}
- * @throws {Error} Invalid alpha transparency level
- */
-function ensureAlpha (alpha) {
-  if (is.defined(alpha)) {
-    if (is.number(alpha) && is.inRange(alpha, 0, 1)) {
-      this.options.ensureAlpha = alpha;
-    } else {
-      throw is.invalidParameterError('alpha', 'number between 0 and 1', alpha);
+  // Wrap each protocol
+  var nativeProtocols = {};
+  Object.keys(protocols).forEach(function (scheme) {
+    var protocol = scheme + ":";
+    var nativeProtocol = nativeProtocols[protocol] = protocols[scheme];
+    var wrappedProtocol = exports[scheme] = Object.create(nativeProtocol);
+
+    // Executes a request, following redirects
+    function request(input, options, callback) {
+      // Parse parameters
+      if (typeof input === "string") {
+        var urlStr = input;
+        try {
+          input = urlToOptions(new URL(urlStr));
+        }
+        catch (err) {
+          /* istanbul ignore next */
+          input = url.parse(urlStr);
+        }
+      }
+      else if (URL && (input instanceof URL)) {
+        input = urlToOptions(input);
+      }
+      else {
+        callback = options;
+        options = input;
+        input = { protocol: protocol };
+      }
+      if (typeof options === "function") {
+        callback = options;
+        options = null;
+      }
+
+      // Set defaults
+      options = Object.assign({
+        maxRedirects: exports.maxRedirects,
+        maxBodyLength: exports.maxBodyLength,
+      }, input, options);
+      options.nativeProtocols = nativeProtocols;
+
+      assert.equal(options.protocol, protocol, "protocol mismatch");
+      debug("options", options);
+      return new RedirectableRequest(options, callback);
     }
-  } else {
-    this.options.ensureAlpha = 1;
-  }
-  return this;
-}
 
-/**
- * Extract a single channel from a multi-channel image.
- *
- * @example
- * sharp(input)
- *   .extractChannel('green')
- *   .toColourspace('b-w')
- *   .toFile('green.jpg', function(err, info) {
- *     // info.channels === 1
- *     // green.jpg is a greyscale image containing the green channel of the input
- *    });
- *
- * @param {number|string} channel - zero-indexed channel/band number to extract, or `red`, `green`, `blue` or `alpha`.
- * @returns {Sharp}
- * @throws {Error} Invalid channel
- */
-function extractChannel (channel) {
-  const channelMap = { red: 0, green: 1, blue: 2, alpha: 3 };
-  if (Object.keys(channelMap).includes(channel)) {
-    channel = channelMap[channel];
-  }
-  if (is.integer(channel) && is.inRange(channel, 0, 4)) {
-    this.options.extractChannel = channel;
-  } else {
-    throw is.invalidParameterError('channel', 'integer or one of: red, green, blue, alpha', channel);
-  }
-  return this;
-}
+    // Executes a GET request, following redirects
+    function get(input, options, callback) {
+      var wrappedRequest = wrappedProtocol.request(input, options, callback);
+      wrappedRequest.end();
+      return wrappedRequest;
+    }
 
-/**
- * Join one or more channels to the image.
- * The meaning of the added channels depends on the output colourspace, set with `toColourspace()`.
- * By default the output image will be web-friendly sRGB, with additional channels interpreted as alpha channels.
- * Channel ordering follows vips convention:
- * - sRGB: 0: Red, 1: Green, 2: Blue, 3: Alpha.
- * - CMYK: 0: Magenta, 1: Cyan, 2: Yellow, 3: Black, 4: Alpha.
- *
- * Buffers may be any of the image formats supported by sharp.
- * For raw pixel input, the `options` object should contain a `raw` attribute, which follows the format of the attribute of the same name in the `sharp()` constructor.
- *
- * @param {Array<string|Buffer>|string|Buffer} images - one or more images (file paths, Buffers).
- * @param {Object} options - image options, see `sharp()` constructor.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function joinChannel (images, options) {
-  if (Array.isArray(images)) {
-    images.forEach(function (image) {
-      this.options.joinChannelIn.push(this._createInputDescriptor(image, options));
-    }, this);
-  } else {
-    this.options.joinChannelIn.push(this._createInputDescriptor(images, options));
-  }
-  return this;
-}
-
-/**
- * Perform a bitwise boolean operation on all input image channels (bands) to produce a single channel output image.
- *
- * @example
- * sharp('3-channel-rgb-input.png')
- *   .bandbool(sharp.bool.and)
- *   .toFile('1-channel-output.png', function (err, info) {
- *     // The output will be a single channel image where each pixel `P = R & G & B`.
- *     // If `I(1,1) = [247, 170, 14] = [0b11110111, 0b10101010, 0b00001111]`
- *     // then `O(1,1) = 0b11110111 & 0b10101010 & 0b00001111 = 0b00000010 = 2`.
- *   });
- *
- * @param {string} boolOp - one of `and`, `or` or `eor` to perform that bitwise operation, like the C logic operators `&`, `|` and `^` respectively.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function bandbool (boolOp) {
-  if (is.string(boolOp) && is.inArray(boolOp, ['and', 'or', 'eor'])) {
-    this.options.bandBoolOp = boolOp;
-  } else {
-    throw is.invalidParameterError('boolOp', 'one of: and, or, eor', boolOp);
-  }
-  return this;
-}
-
-/**
- * Decorate the Sharp prototype with channel-related functions.
- * @private
- */
-module.exports = function (Sharp) {
-  Object.assign(Sharp.prototype, {
-    // Public instance functions
-    removeAlpha,
-    ensureAlpha,
-    extractChannel,
-    joinChannel,
-    bandbool
+    // Expose the properties on the wrapped protocol
+    Object.defineProperties(wrappedProtocol, {
+      request: { value: request, configurable: true, enumerable: true, writable: true },
+      get: { value: get, configurable: true, enumerable: true, writable: true },
+    });
   });
-  // Class attributes
-  Sharp.bool = bool;
-};
-
-
-/***/ }),
-/* 177 */,
-/* 178 */,
-/* 179 */,
-/* 180 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-const compare = __webpack_require__(233)
-const gt = (a, b, loose) => compare(a, b, loose) > 0
-module.exports = gt
-
-
-/***/ }),
-/* 181 */,
-/* 182 */,
-/* 183 */,
-/* 184 */,
-/* 185 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-const SemVer = __webpack_require__(82)
-const compareBuild = (a, b, loose) => {
-  const versionA = new SemVer(a, loose)
-  const versionB = new SemVer(b, loose)
-  return versionA.compare(versionB) || versionA.compareBuild(versionB)
+  return exports;
 }
-module.exports = compareBuild
+
+/* istanbul ignore next */
+function noop() { /* empty */ }
+
+// from https://github.com/nodejs/node/blob/master/lib/internal/url.js
+function urlToOptions(urlObject) {
+  var options = {
+    protocol: urlObject.protocol,
+    hostname: urlObject.hostname.startsWith("[") ?
+      /* istanbul ignore next */
+      urlObject.hostname.slice(1, -1) :
+      urlObject.hostname,
+    hash: urlObject.hash,
+    search: urlObject.search,
+    pathname: urlObject.pathname,
+    path: urlObject.pathname + urlObject.search,
+    href: urlObject.href,
+  };
+  if (urlObject.port !== "") {
+    options.port = Number(urlObject.port);
+  }
+  return options;
+}
+
+function removeMatchingHeaders(regex, headers) {
+  var lastValue;
+  for (var header in headers) {
+    if (regex.test(header)) {
+      lastValue = headers[header];
+      delete headers[header];
+    }
+  }
+  return lastValue;
+}
+
+function createErrorType(code, defaultMessage) {
+  function CustomError(message) {
+    Error.captureStackTrace(this, this.constructor);
+    this.message = message || defaultMessage;
+  }
+  CustomError.prototype = new Error();
+  CustomError.prototype.constructor = CustomError;
+  CustomError.prototype.name = "Error [" + code + "]";
+  CustomError.prototype.code = code;
+  return CustomError;
+}
+
+// Exports
+module.exports = wrap({ http: http, https: https });
+module.exports.wrap = wrap;
 
 
 /***/ }),
-/* 186 */
+
+/***/ 186:
 /***/ (function(module) {
 
 "use strict";
@@ -12232,7 +8657,8 @@ module.exports = GenericWorker;
 
 
 /***/ }),
-/* 187 */
+
+/***/ 187:
 /***/ (function(module) {
 
 "use strict";
@@ -12307,74 +8733,1034 @@ module.exports = {
 
 
 /***/ }),
-/* 188 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-"use strict";
-
-
-exports.base64 = true;
-exports.array = true;
-exports.string = true;
-exports.arraybuffer = typeof ArrayBuffer !== "undefined" && typeof Uint8Array !== "undefined";
-exports.nodebuffer = typeof Buffer !== "undefined";
-// contains true if JSZip can read/generate Uint8Array, false otherwise.
-exports.uint8array = typeof Uint8Array !== "undefined";
-
-if (typeof ArrayBuffer === "undefined") {
-    exports.blob = false;
-}
-else {
-    var buffer = new ArrayBuffer(0);
-    try {
-        exports.blob = new Blob([buffer], {
-            type: "application/zip"
-        }).size === 0;
-    }
-    catch (e) {
-        try {
-            var Builder = self.BlobBuilder || self.WebKitBlobBuilder || self.MozBlobBuilder || self.MSBlobBuilder;
-            var builder = new Builder();
-            builder.append(buffer);
-            exports.blob = builder.getBlob('application/zip').size === 0;
-        }
-        catch (e) {
-            exports.blob = false;
-        }
-    }
-}
-
-try {
-    exports.nodestream = !!__webpack_require__(559).Readable;
-} catch(e) {
-    exports.nodestream = false;
-}
-
-
-/***/ }),
-/* 189 */
+/***/ 188:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-const Sharp = __webpack_require__(493);
-__webpack_require__(676)(Sharp);
-__webpack_require__(437)(Sharp);
-__webpack_require__(660)(Sharp);
-__webpack_require__(361)(Sharp);
-__webpack_require__(88)(Sharp);
-__webpack_require__(176)(Sharp);
-__webpack_require__(21)(Sharp);
-__webpack_require__(32)(Sharp);
 
-module.exports = Sharp;
+/*<replacement>*/
 
+var pna = __webpack_require__(391);
+/*</replacement>*/
+
+module.exports = Readable;
+
+/*<replacement>*/
+var isArray = __webpack_require__(425);
+/*</replacement>*/
+
+/*<replacement>*/
+var Duplex;
+/*</replacement>*/
+
+Readable.ReadableState = ReadableState;
+
+/*<replacement>*/
+var EE = __webpack_require__(614).EventEmitter;
+
+var EElistenerCount = function (emitter, type) {
+  return emitter.listeners(type).length;
+};
+/*</replacement>*/
+
+/*<replacement>*/
+var Stream = __webpack_require__(811);
+/*</replacement>*/
+
+/*<replacement>*/
+
+var Buffer = __webpack_require__(226).Buffer;
+var OurUint8Array = global.Uint8Array || function () {};
+function _uint8ArrayToBuffer(chunk) {
+  return Buffer.from(chunk);
+}
+function _isUint8Array(obj) {
+  return Buffer.isBuffer(obj) || obj instanceof OurUint8Array;
+}
+
+/*</replacement>*/
+
+/*<replacement>*/
+var util = Object.create(__webpack_require__(490));
+util.inherits = __webpack_require__(476);
+/*</replacement>*/
+
+/*<replacement>*/
+var debugUtil = __webpack_require__(669);
+var debug = void 0;
+if (debugUtil && debugUtil.debuglog) {
+  debug = debugUtil.debuglog('stream');
+} else {
+  debug = function () {};
+}
+/*</replacement>*/
+
+var BufferList = __webpack_require__(139);
+var destroyImpl = __webpack_require__(576);
+var StringDecoder;
+
+util.inherits(Readable, Stream);
+
+var kProxyEvents = ['error', 'close', 'destroy', 'pause', 'resume'];
+
+function prependListener(emitter, event, fn) {
+  // Sadly this is not cacheable as some libraries bundle their own
+  // event emitter implementation with them.
+  if (typeof emitter.prependListener === 'function') return emitter.prependListener(event, fn);
+
+  // This is a hack to make sure that our error handler is attached before any
+  // userland ones.  NEVER DO THIS. This is here only because this code needs
+  // to continue to work with older versions of Node.js that do not include
+  // the prependListener() method. The goal is to eventually remove this hack.
+  if (!emitter._events || !emitter._events[event]) emitter.on(event, fn);else if (isArray(emitter._events[event])) emitter._events[event].unshift(fn);else emitter._events[event] = [fn, emitter._events[event]];
+}
+
+function ReadableState(options, stream) {
+  Duplex = Duplex || __webpack_require__(329);
+
+  options = options || {};
+
+  // Duplex streams are both readable and writable, but share
+  // the same options object.
+  // However, some cases require setting options to different
+  // values for the readable and the writable sides of the duplex stream.
+  // These options can be provided separately as readableXXX and writableXXX.
+  var isDuplex = stream instanceof Duplex;
+
+  // object stream flag. Used to make read(n) ignore n and to
+  // make all the buffer merging and length checks go away
+  this.objectMode = !!options.objectMode;
+
+  if (isDuplex) this.objectMode = this.objectMode || !!options.readableObjectMode;
+
+  // the point at which it stops calling _read() to fill the buffer
+  // Note: 0 is a valid value, means "don't call _read preemptively ever"
+  var hwm = options.highWaterMark;
+  var readableHwm = options.readableHighWaterMark;
+  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
+
+  if (hwm || hwm === 0) this.highWaterMark = hwm;else if (isDuplex && (readableHwm || readableHwm === 0)) this.highWaterMark = readableHwm;else this.highWaterMark = defaultHwm;
+
+  // cast to ints.
+  this.highWaterMark = Math.floor(this.highWaterMark);
+
+  // A linked list is used to store data chunks instead of an array because the
+  // linked list can remove elements from the beginning faster than
+  // array.shift()
+  this.buffer = new BufferList();
+  this.length = 0;
+  this.pipes = null;
+  this.pipesCount = 0;
+  this.flowing = null;
+  this.ended = false;
+  this.endEmitted = false;
+  this.reading = false;
+
+  // a flag to be able to tell if the event 'readable'/'data' is emitted
+  // immediately, or on a later tick.  We set this to true at first, because
+  // any actions that shouldn't happen until "later" should generally also
+  // not happen before the first read call.
+  this.sync = true;
+
+  // whenever we return null, then we set a flag to say
+  // that we're awaiting a 'readable' event emission.
+  this.needReadable = false;
+  this.emittedReadable = false;
+  this.readableListening = false;
+  this.resumeScheduled = false;
+
+  // has it been destroyed
+  this.destroyed = false;
+
+  // Crypto is kind of old and crusty.  Historically, its default string
+  // encoding is 'binary' so we have to make this configurable.
+  // Everything else in the universe uses 'utf8', though.
+  this.defaultEncoding = options.defaultEncoding || 'utf8';
+
+  // the number of writers that are awaiting a drain event in .pipe()s
+  this.awaitDrain = 0;
+
+  // if true, a maybeReadMore has been scheduled
+  this.readingMore = false;
+
+  this.decoder = null;
+  this.encoding = null;
+  if (options.encoding) {
+    if (!StringDecoder) StringDecoder = __webpack_require__(394).StringDecoder;
+    this.decoder = new StringDecoder(options.encoding);
+    this.encoding = options.encoding;
+  }
+}
+
+function Readable(options) {
+  Duplex = Duplex || __webpack_require__(329);
+
+  if (!(this instanceof Readable)) return new Readable(options);
+
+  this._readableState = new ReadableState(options, this);
+
+  // legacy
+  this.readable = true;
+
+  if (options) {
+    if (typeof options.read === 'function') this._read = options.read;
+
+    if (typeof options.destroy === 'function') this._destroy = options.destroy;
+  }
+
+  Stream.call(this);
+}
+
+Object.defineProperty(Readable.prototype, 'destroyed', {
+  get: function () {
+    if (this._readableState === undefined) {
+      return false;
+    }
+    return this._readableState.destroyed;
+  },
+  set: function (value) {
+    // we ignore the value if the stream
+    // has not been initialized yet
+    if (!this._readableState) {
+      return;
+    }
+
+    // backward compatibility, the user is explicitly
+    // managing destroyed
+    this._readableState.destroyed = value;
+  }
+});
+
+Readable.prototype.destroy = destroyImpl.destroy;
+Readable.prototype._undestroy = destroyImpl.undestroy;
+Readable.prototype._destroy = function (err, cb) {
+  this.push(null);
+  cb(err);
+};
+
+// Manually shove something into the read() buffer.
+// This returns true if the highWaterMark has not been hit yet,
+// similar to how Writable.write() returns true if you should
+// write() some more.
+Readable.prototype.push = function (chunk, encoding) {
+  var state = this._readableState;
+  var skipChunkCheck;
+
+  if (!state.objectMode) {
+    if (typeof chunk === 'string') {
+      encoding = encoding || state.defaultEncoding;
+      if (encoding !== state.encoding) {
+        chunk = Buffer.from(chunk, encoding);
+        encoding = '';
+      }
+      skipChunkCheck = true;
+    }
+  } else {
+    skipChunkCheck = true;
+  }
+
+  return readableAddChunk(this, chunk, encoding, false, skipChunkCheck);
+};
+
+// Unshift should *always* be something directly out of read()
+Readable.prototype.unshift = function (chunk) {
+  return readableAddChunk(this, chunk, null, true, false);
+};
+
+function readableAddChunk(stream, chunk, encoding, addToFront, skipChunkCheck) {
+  var state = stream._readableState;
+  if (chunk === null) {
+    state.reading = false;
+    onEofChunk(stream, state);
+  } else {
+    var er;
+    if (!skipChunkCheck) er = chunkInvalid(state, chunk);
+    if (er) {
+      stream.emit('error', er);
+    } else if (state.objectMode || chunk && chunk.length > 0) {
+      if (typeof chunk !== 'string' && !state.objectMode && Object.getPrototypeOf(chunk) !== Buffer.prototype) {
+        chunk = _uint8ArrayToBuffer(chunk);
+      }
+
+      if (addToFront) {
+        if (state.endEmitted) stream.emit('error', new Error('stream.unshift() after end event'));else addChunk(stream, state, chunk, true);
+      } else if (state.ended) {
+        stream.emit('error', new Error('stream.push() after EOF'));
+      } else {
+        state.reading = false;
+        if (state.decoder && !encoding) {
+          chunk = state.decoder.write(chunk);
+          if (state.objectMode || chunk.length !== 0) addChunk(stream, state, chunk, false);else maybeReadMore(stream, state);
+        } else {
+          addChunk(stream, state, chunk, false);
+        }
+      }
+    } else if (!addToFront) {
+      state.reading = false;
+    }
+  }
+
+  return needMoreData(state);
+}
+
+function addChunk(stream, state, chunk, addToFront) {
+  if (state.flowing && state.length === 0 && !state.sync) {
+    stream.emit('data', chunk);
+    stream.read(0);
+  } else {
+    // update the buffer info.
+    state.length += state.objectMode ? 1 : chunk.length;
+    if (addToFront) state.buffer.unshift(chunk);else state.buffer.push(chunk);
+
+    if (state.needReadable) emitReadable(stream);
+  }
+  maybeReadMore(stream, state);
+}
+
+function chunkInvalid(state, chunk) {
+  var er;
+  if (!_isUint8Array(chunk) && typeof chunk !== 'string' && chunk !== undefined && !state.objectMode) {
+    er = new TypeError('Invalid non-string/buffer chunk');
+  }
+  return er;
+}
+
+// if it's past the high water mark, we can push in some more.
+// Also, if we have no data yet, we can stand some
+// more bytes.  This is to work around cases where hwm=0,
+// such as the repl.  Also, if the push() triggered a
+// readable event, and the user called read(largeNumber) such that
+// needReadable was set, then we ought to push more, so that another
+// 'readable' event will be triggered.
+function needMoreData(state) {
+  return !state.ended && (state.needReadable || state.length < state.highWaterMark || state.length === 0);
+}
+
+Readable.prototype.isPaused = function () {
+  return this._readableState.flowing === false;
+};
+
+// backwards compatibility.
+Readable.prototype.setEncoding = function (enc) {
+  if (!StringDecoder) StringDecoder = __webpack_require__(394).StringDecoder;
+  this._readableState.decoder = new StringDecoder(enc);
+  this._readableState.encoding = enc;
+  return this;
+};
+
+// Don't raise the hwm > 8MB
+var MAX_HWM = 0x800000;
+function computeNewHighWaterMark(n) {
+  if (n >= MAX_HWM) {
+    n = MAX_HWM;
+  } else {
+    // Get the next highest power of 2 to prevent increasing hwm excessively in
+    // tiny amounts
+    n--;
+    n |= n >>> 1;
+    n |= n >>> 2;
+    n |= n >>> 4;
+    n |= n >>> 8;
+    n |= n >>> 16;
+    n++;
+  }
+  return n;
+}
+
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function howMuchToRead(n, state) {
+  if (n <= 0 || state.length === 0 && state.ended) return 0;
+  if (state.objectMode) return 1;
+  if (n !== n) {
+    // Only flow one buffer at a time
+    if (state.flowing && state.length) return state.buffer.head.data.length;else return state.length;
+  }
+  // If we're asking for more than the current hwm, then raise the hwm.
+  if (n > state.highWaterMark) state.highWaterMark = computeNewHighWaterMark(n);
+  if (n <= state.length) return n;
+  // Don't have enough
+  if (!state.ended) {
+    state.needReadable = true;
+    return 0;
+  }
+  return state.length;
+}
+
+// you can override either this method, or the async _read(n) below.
+Readable.prototype.read = function (n) {
+  debug('read', n);
+  n = parseInt(n, 10);
+  var state = this._readableState;
+  var nOrig = n;
+
+  if (n !== 0) state.emittedReadable = false;
+
+  // if we're doing read(0) to trigger a readable event, but we
+  // already have a bunch of data in the buffer, then just trigger
+  // the 'readable' event and move on.
+  if (n === 0 && state.needReadable && (state.length >= state.highWaterMark || state.ended)) {
+    debug('read: emitReadable', state.length, state.ended);
+    if (state.length === 0 && state.ended) endReadable(this);else emitReadable(this);
+    return null;
+  }
+
+  n = howMuchToRead(n, state);
+
+  // if we've ended, and we're now clear, then finish it up.
+  if (n === 0 && state.ended) {
+    if (state.length === 0) endReadable(this);
+    return null;
+  }
+
+  // All the actual chunk generation logic needs to be
+  // *below* the call to _read.  The reason is that in certain
+  // synthetic stream cases, such as passthrough streams, _read
+  // may be a completely synchronous operation which may change
+  // the state of the read buffer, providing enough data when
+  // before there was *not* enough.
+  //
+  // So, the steps are:
+  // 1. Figure out what the state of things will be after we do
+  // a read from the buffer.
+  //
+  // 2. If that resulting state will trigger a _read, then call _read.
+  // Note that this may be asynchronous, or synchronous.  Yes, it is
+  // deeply ugly to write APIs this way, but that still doesn't mean
+  // that the Readable class should behave improperly, as streams are
+  // designed to be sync/async agnostic.
+  // Take note if the _read call is sync or async (ie, if the read call
+  // has returned yet), so that we know whether or not it's safe to emit
+  // 'readable' etc.
+  //
+  // 3. Actually pull the requested chunks out of the buffer and return.
+
+  // if we need a readable event, then we need to do some reading.
+  var doRead = state.needReadable;
+  debug('need readable', doRead);
+
+  // if we currently have less than the highWaterMark, then also read some
+  if (state.length === 0 || state.length - n < state.highWaterMark) {
+    doRead = true;
+    debug('length less than watermark', doRead);
+  }
+
+  // however, if we've ended, then there's no point, and if we're already
+  // reading, then it's unnecessary.
+  if (state.ended || state.reading) {
+    doRead = false;
+    debug('reading or ended', doRead);
+  } else if (doRead) {
+    debug('do read');
+    state.reading = true;
+    state.sync = true;
+    // if the length is currently zero, then we *need* a readable event.
+    if (state.length === 0) state.needReadable = true;
+    // call internal read method
+    this._read(state.highWaterMark);
+    state.sync = false;
+    // If _read pushed data synchronously, then `reading` will be false,
+    // and we need to re-evaluate how much data we can return to the user.
+    if (!state.reading) n = howMuchToRead(nOrig, state);
+  }
+
+  var ret;
+  if (n > 0) ret = fromList(n, state);else ret = null;
+
+  if (ret === null) {
+    state.needReadable = true;
+    n = 0;
+  } else {
+    state.length -= n;
+  }
+
+  if (state.length === 0) {
+    // If we have nothing in the buffer, then we want to know
+    // as soon as we *do* get something into the buffer.
+    if (!state.ended) state.needReadable = true;
+
+    // If we tried to read() past the EOF, then emit end on the next tick.
+    if (nOrig !== n && state.ended) endReadable(this);
+  }
+
+  if (ret !== null) this.emit('data', ret);
+
+  return ret;
+};
+
+function onEofChunk(stream, state) {
+  if (state.ended) return;
+  if (state.decoder) {
+    var chunk = state.decoder.end();
+    if (chunk && chunk.length) {
+      state.buffer.push(chunk);
+      state.length += state.objectMode ? 1 : chunk.length;
+    }
+  }
+  state.ended = true;
+
+  // emit 'readable' now to make sure it gets picked up.
+  emitReadable(stream);
+}
+
+// Don't emit readable right away in sync mode, because this can trigger
+// another read() call => stack overflow.  This way, it might trigger
+// a nextTick recursion warning, but that's not so bad.
+function emitReadable(stream) {
+  var state = stream._readableState;
+  state.needReadable = false;
+  if (!state.emittedReadable) {
+    debug('emitReadable', state.flowing);
+    state.emittedReadable = true;
+    if (state.sync) pna.nextTick(emitReadable_, stream);else emitReadable_(stream);
+  }
+}
+
+function emitReadable_(stream) {
+  debug('emit readable');
+  stream.emit('readable');
+  flow(stream);
+}
+
+// at this point, the user has presumably seen the 'readable' event,
+// and called read() to consume some data.  that may have triggered
+// in turn another _read(n) call, in which case reading = true if
+// it's in progress.
+// However, if we're not ended, or reading, and the length < hwm,
+// then go ahead and try to read some more preemptively.
+function maybeReadMore(stream, state) {
+  if (!state.readingMore) {
+    state.readingMore = true;
+    pna.nextTick(maybeReadMore_, stream, state);
+  }
+}
+
+function maybeReadMore_(stream, state) {
+  var len = state.length;
+  while (!state.reading && !state.flowing && !state.ended && state.length < state.highWaterMark) {
+    debug('maybeReadMore read 0');
+    stream.read(0);
+    if (len === state.length)
+      // didn't get any data, stop spinning.
+      break;else len = state.length;
+  }
+  state.readingMore = false;
+}
+
+// abstract method.  to be overridden in specific implementation classes.
+// call cb(er, data) where data is <= n in length.
+// for virtual (non-string, non-buffer) streams, "length" is somewhat
+// arbitrary, and perhaps not very meaningful.
+Readable.prototype._read = function (n) {
+  this.emit('error', new Error('_read() is not implemented'));
+};
+
+Readable.prototype.pipe = function (dest, pipeOpts) {
+  var src = this;
+  var state = this._readableState;
+
+  switch (state.pipesCount) {
+    case 0:
+      state.pipes = dest;
+      break;
+    case 1:
+      state.pipes = [state.pipes, dest];
+      break;
+    default:
+      state.pipes.push(dest);
+      break;
+  }
+  state.pipesCount += 1;
+  debug('pipe count=%d opts=%j', state.pipesCount, pipeOpts);
+
+  var doEnd = (!pipeOpts || pipeOpts.end !== false) && dest !== process.stdout && dest !== process.stderr;
+
+  var endFn = doEnd ? onend : unpipe;
+  if (state.endEmitted) pna.nextTick(endFn);else src.once('end', endFn);
+
+  dest.on('unpipe', onunpipe);
+  function onunpipe(readable, unpipeInfo) {
+    debug('onunpipe');
+    if (readable === src) {
+      if (unpipeInfo && unpipeInfo.hasUnpiped === false) {
+        unpipeInfo.hasUnpiped = true;
+        cleanup();
+      }
+    }
+  }
+
+  function onend() {
+    debug('onend');
+    dest.end();
+  }
+
+  // when the dest drains, it reduces the awaitDrain counter
+  // on the source.  This would be more elegant with a .once()
+  // handler in flow(), but adding and removing repeatedly is
+  // too slow.
+  var ondrain = pipeOnDrain(src);
+  dest.on('drain', ondrain);
+
+  var cleanedUp = false;
+  function cleanup() {
+    debug('cleanup');
+    // cleanup event handlers once the pipe is broken
+    dest.removeListener('close', onclose);
+    dest.removeListener('finish', onfinish);
+    dest.removeListener('drain', ondrain);
+    dest.removeListener('error', onerror);
+    dest.removeListener('unpipe', onunpipe);
+    src.removeListener('end', onend);
+    src.removeListener('end', unpipe);
+    src.removeListener('data', ondata);
+
+    cleanedUp = true;
+
+    // if the reader is waiting for a drain event from this
+    // specific writer, then it would cause it to never start
+    // flowing again.
+    // So, if this is awaiting a drain, then we just call it now.
+    // If we don't know, then assume that we are waiting for one.
+    if (state.awaitDrain && (!dest._writableState || dest._writableState.needDrain)) ondrain();
+  }
+
+  // If the user pushes more data while we're writing to dest then we'll end up
+  // in ondata again. However, we only want to increase awaitDrain once because
+  // dest will only emit one 'drain' event for the multiple writes.
+  // => Introduce a guard on increasing awaitDrain.
+  var increasedAwaitDrain = false;
+  src.on('data', ondata);
+  function ondata(chunk) {
+    debug('ondata');
+    increasedAwaitDrain = false;
+    var ret = dest.write(chunk);
+    if (false === ret && !increasedAwaitDrain) {
+      // If the user unpiped during `dest.write()`, it is possible
+      // to get stuck in a permanently paused state if that write
+      // also returned false.
+      // => Check whether `dest` is still a piping destination.
+      if ((state.pipesCount === 1 && state.pipes === dest || state.pipesCount > 1 && indexOf(state.pipes, dest) !== -1) && !cleanedUp) {
+        debug('false write response, pause', src._readableState.awaitDrain);
+        src._readableState.awaitDrain++;
+        increasedAwaitDrain = true;
+      }
+      src.pause();
+    }
+  }
+
+  // if the dest has an error, then stop piping into it.
+  // however, don't suppress the throwing behavior for this.
+  function onerror(er) {
+    debug('onerror', er);
+    unpipe();
+    dest.removeListener('error', onerror);
+    if (EElistenerCount(dest, 'error') === 0) dest.emit('error', er);
+  }
+
+  // Make sure our error handler is attached before userland ones.
+  prependListener(dest, 'error', onerror);
+
+  // Both close and finish should trigger unpipe, but only once.
+  function onclose() {
+    dest.removeListener('finish', onfinish);
+    unpipe();
+  }
+  dest.once('close', onclose);
+  function onfinish() {
+    debug('onfinish');
+    dest.removeListener('close', onclose);
+    unpipe();
+  }
+  dest.once('finish', onfinish);
+
+  function unpipe() {
+    debug('unpipe');
+    src.unpipe(dest);
+  }
+
+  // tell the dest that it's being piped to
+  dest.emit('pipe', src);
+
+  // start the flow if it hasn't been started already.
+  if (!state.flowing) {
+    debug('pipe resume');
+    src.resume();
+  }
+
+  return dest;
+};
+
+function pipeOnDrain(src) {
+  return function () {
+    var state = src._readableState;
+    debug('pipeOnDrain', state.awaitDrain);
+    if (state.awaitDrain) state.awaitDrain--;
+    if (state.awaitDrain === 0 && EElistenerCount(src, 'data')) {
+      state.flowing = true;
+      flow(src);
+    }
+  };
+}
+
+Readable.prototype.unpipe = function (dest) {
+  var state = this._readableState;
+  var unpipeInfo = { hasUnpiped: false };
+
+  // if we're not piping anywhere, then do nothing.
+  if (state.pipesCount === 0) return this;
+
+  // just one destination.  most common case.
+  if (state.pipesCount === 1) {
+    // passed in one, but it's not the right one.
+    if (dest && dest !== state.pipes) return this;
+
+    if (!dest) dest = state.pipes;
+
+    // got a match.
+    state.pipes = null;
+    state.pipesCount = 0;
+    state.flowing = false;
+    if (dest) dest.emit('unpipe', this, unpipeInfo);
+    return this;
+  }
+
+  // slow case. multiple pipe destinations.
+
+  if (!dest) {
+    // remove all.
+    var dests = state.pipes;
+    var len = state.pipesCount;
+    state.pipes = null;
+    state.pipesCount = 0;
+    state.flowing = false;
+
+    for (var i = 0; i < len; i++) {
+      dests[i].emit('unpipe', this, unpipeInfo);
+    }return this;
+  }
+
+  // try to find the right one.
+  var index = indexOf(state.pipes, dest);
+  if (index === -1) return this;
+
+  state.pipes.splice(index, 1);
+  state.pipesCount -= 1;
+  if (state.pipesCount === 1) state.pipes = state.pipes[0];
+
+  dest.emit('unpipe', this, unpipeInfo);
+
+  return this;
+};
+
+// set up data events if they are asked for
+// Ensure readable listeners eventually get something
+Readable.prototype.on = function (ev, fn) {
+  var res = Stream.prototype.on.call(this, ev, fn);
+
+  if (ev === 'data') {
+    // Start flowing on next tick if stream isn't explicitly paused
+    if (this._readableState.flowing !== false) this.resume();
+  } else if (ev === 'readable') {
+    var state = this._readableState;
+    if (!state.endEmitted && !state.readableListening) {
+      state.readableListening = state.needReadable = true;
+      state.emittedReadable = false;
+      if (!state.reading) {
+        pna.nextTick(nReadingNextTick, this);
+      } else if (state.length) {
+        emitReadable(this);
+      }
+    }
+  }
+
+  return res;
+};
+Readable.prototype.addListener = Readable.prototype.on;
+
+function nReadingNextTick(self) {
+  debug('readable nexttick read 0');
+  self.read(0);
+}
+
+// pause() and resume() are remnants of the legacy readable stream API
+// If the user uses them, then switch into old mode.
+Readable.prototype.resume = function () {
+  var state = this._readableState;
+  if (!state.flowing) {
+    debug('resume');
+    state.flowing = true;
+    resume(this, state);
+  }
+  return this;
+};
+
+function resume(stream, state) {
+  if (!state.resumeScheduled) {
+    state.resumeScheduled = true;
+    pna.nextTick(resume_, stream, state);
+  }
+}
+
+function resume_(stream, state) {
+  if (!state.reading) {
+    debug('resume read 0');
+    stream.read(0);
+  }
+
+  state.resumeScheduled = false;
+  state.awaitDrain = 0;
+  stream.emit('resume');
+  flow(stream);
+  if (state.flowing && !state.reading) stream.read(0);
+}
+
+Readable.prototype.pause = function () {
+  debug('call pause flowing=%j', this._readableState.flowing);
+  if (false !== this._readableState.flowing) {
+    debug('pause');
+    this._readableState.flowing = false;
+    this.emit('pause');
+  }
+  return this;
+};
+
+function flow(stream) {
+  var state = stream._readableState;
+  debug('flow', state.flowing);
+  while (state.flowing && stream.read() !== null) {}
+}
+
+// wrap an old-style stream as the async data source.
+// This is *not* part of the readable stream interface.
+// It is an ugly unfortunate mess of history.
+Readable.prototype.wrap = function (stream) {
+  var _this = this;
+
+  var state = this._readableState;
+  var paused = false;
+
+  stream.on('end', function () {
+    debug('wrapped end');
+    if (state.decoder && !state.ended) {
+      var chunk = state.decoder.end();
+      if (chunk && chunk.length) _this.push(chunk);
+    }
+
+    _this.push(null);
+  });
+
+  stream.on('data', function (chunk) {
+    debug('wrapped data');
+    if (state.decoder) chunk = state.decoder.write(chunk);
+
+    // don't skip over falsy values in objectMode
+    if (state.objectMode && (chunk === null || chunk === undefined)) return;else if (!state.objectMode && (!chunk || !chunk.length)) return;
+
+    var ret = _this.push(chunk);
+    if (!ret) {
+      paused = true;
+      stream.pause();
+    }
+  });
+
+  // proxy all the other methods.
+  // important when wrapping filters and duplexes.
+  for (var i in stream) {
+    if (this[i] === undefined && typeof stream[i] === 'function') {
+      this[i] = function (method) {
+        return function () {
+          return stream[method].apply(stream, arguments);
+        };
+      }(i);
+    }
+  }
+
+  // proxy certain important events.
+  for (var n = 0; n < kProxyEvents.length; n++) {
+    stream.on(kProxyEvents[n], this.emit.bind(this, kProxyEvents[n]));
+  }
+
+  // when we try to consume some more bytes, simply unpause the
+  // underlying stream.
+  this._read = function (n) {
+    debug('wrapped _read', n);
+    if (paused) {
+      paused = false;
+      stream.resume();
+    }
+  };
+
+  return this;
+};
+
+Object.defineProperty(Readable.prototype, 'readableHighWaterMark', {
+  // making it explicit this property is not enumerable
+  // because otherwise some prototype manipulation in
+  // userland will fail
+  enumerable: false,
+  get: function () {
+    return this._readableState.highWaterMark;
+  }
+});
+
+// exposed for testing purposes only.
+Readable._fromList = fromList;
+
+// Pluck off n bytes from an array of buffers.
+// Length is the combined lengths of all the buffers in the list.
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function fromList(n, state) {
+  // nothing buffered
+  if (state.length === 0) return null;
+
+  var ret;
+  if (state.objectMode) ret = state.buffer.shift();else if (!n || n >= state.length) {
+    // read it all, truncate the list
+    if (state.decoder) ret = state.buffer.join('');else if (state.buffer.length === 1) ret = state.buffer.head.data;else ret = state.buffer.concat(state.length);
+    state.buffer.clear();
+  } else {
+    // read part of list
+    ret = fromListPartial(n, state.buffer, state.decoder);
+  }
+
+  return ret;
+}
+
+// Extracts only enough buffered data to satisfy the amount requested.
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function fromListPartial(n, list, hasStrings) {
+  var ret;
+  if (n < list.head.data.length) {
+    // slice is the same for buffers and strings
+    ret = list.head.data.slice(0, n);
+    list.head.data = list.head.data.slice(n);
+  } else if (n === list.head.data.length) {
+    // first chunk is a perfect match
+    ret = list.shift();
+  } else {
+    // result spans more than one buffer
+    ret = hasStrings ? copyFromBufferString(n, list) : copyFromBuffer(n, list);
+  }
+  return ret;
+}
+
+// Copies a specified amount of characters from the list of buffered data
+// chunks.
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function copyFromBufferString(n, list) {
+  var p = list.head;
+  var c = 1;
+  var ret = p.data;
+  n -= ret.length;
+  while (p = p.next) {
+    var str = p.data;
+    var nb = n > str.length ? str.length : n;
+    if (nb === str.length) ret += str;else ret += str.slice(0, n);
+    n -= nb;
+    if (n === 0) {
+      if (nb === str.length) {
+        ++c;
+        if (p.next) list.head = p.next;else list.head = list.tail = null;
+      } else {
+        list.head = p;
+        p.data = str.slice(nb);
+      }
+      break;
+    }
+    ++c;
+  }
+  list.length -= c;
+  return ret;
+}
+
+// Copies a specified amount of bytes from the list of buffered data chunks.
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function copyFromBuffer(n, list) {
+  var ret = Buffer.allocUnsafe(n);
+  var p = list.head;
+  var c = 1;
+  p.data.copy(ret);
+  n -= p.data.length;
+  while (p = p.next) {
+    var buf = p.data;
+    var nb = n > buf.length ? buf.length : n;
+    buf.copy(ret, ret.length - n, 0, nb);
+    n -= nb;
+    if (n === 0) {
+      if (nb === buf.length) {
+        ++c;
+        if (p.next) list.head = p.next;else list.head = list.tail = null;
+      } else {
+        list.head = p;
+        p.data = buf.slice(nb);
+      }
+      break;
+    }
+    ++c;
+  }
+  list.length -= c;
+  return ret;
+}
+
+function endReadable(stream) {
+  var state = stream._readableState;
+
+  // If we get here before consuming all the bytes, then that is a
+  // bug in node.  Should never happen.
+  if (state.length > 0) throw new Error('"endReadable()" called on non-empty stream');
+
+  if (!state.endEmitted) {
+    state.ended = true;
+    pna.nextTick(endReadableNT, state, stream);
+  }
+}
+
+function endReadableNT(state, stream) {
+  // Check that we didn't get one last unshift.
+  if (!state.endEmitted && state.length === 0) {
+    state.endEmitted = true;
+    stream.readable = false;
+    stream.emit('end');
+  }
+}
+
+function indexOf(xs, x) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    if (xs[i] === x) return i;
+  }
+  return -1;
+}
 
 /***/ }),
-/* 190 */,
-/* 191 */,
-/* 192 */
+
+/***/ 192:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -12434,12 +9820,8 @@ module.exports = (
 
 
 /***/ }),
-/* 193 */,
-/* 194 */,
-/* 195 */,
-/* 196 */,
-/* 197 */,
-/* 198 */
+
+/***/ 198:
 /***/ (function(module) {
 
 module.exports = function (xs, fn) {
@@ -12458,9 +9840,8 @@ var isArray = Array.isArray || function (xs) {
 
 
 /***/ }),
-/* 199 */,
-/* 200 */,
-/* 201 */
+
+/***/ 201:
 /***/ (function(module) {
 
 "use strict";
@@ -12486,9 +9867,8 @@ module.exports = Cancel;
 
 
 /***/ }),
-/* 202 */,
-/* 203 */,
-/* 204 */
+
+/***/ 204:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -12500,8 +9880,8 @@ module.exports = {
 
 
 /***/ }),
-/* 205 */,
-/* 206 */
+
+/***/ 206:
 /***/ (function(module) {
 
 "use strict";
@@ -12519,9 +9899,8 @@ module.exports = function bind(fn, thisArg) {
 
 
 /***/ }),
-/* 207 */,
-/* 208 */,
-/* 209 */
+
+/***/ 209:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 // Approach:
@@ -13317,23 +10696,15 @@ Glob.prototype._stat2 = function (f, abs, er, stat, cb) {
 
 
 /***/ }),
-/* 210 */,
-/* 211 */
+
+/***/ 211:
 /***/ (function(module) {
 
 module.exports = require("https");
 
 /***/ }),
-/* 212 */,
-/* 213 */,
-/* 214 */,
-/* 215 */,
-/* 216 */,
-/* 217 */,
-/* 218 */,
-/* 219 */,
-/* 220 */,
-/* 221 */
+
+/***/ 221:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -13425,11 +10796,8 @@ exports.uncompressWorker = function () {
 
 
 /***/ }),
-/* 222 */,
-/* 223 */,
-/* 224 */,
-/* 225 */,
-/* 226 */
+
+/***/ 226:
 /***/ (function(module, exports, __webpack_require__) {
 
 /* eslint-disable node/no-deprecated-api */
@@ -13497,28 +10865,8 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 
 
 /***/ }),
-/* 227 */,
-/* 228 */,
-/* 229 */,
-/* 230 */,
-/* 231 */,
-/* 232 */,
-/* 233 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const SemVer = __webpack_require__(82)
-const compare = (a, b, loose) =>
-  new SemVer(a, loose).compare(new SemVer(b, loose))
-
-module.exports = compare
-
-
-/***/ }),
-/* 234 */,
-/* 235 */,
-/* 236 */,
-/* 237 */,
-/* 238 */
+/***/ 238:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -13528,7 +10876,7 @@ var utils = __webpack_require__(901);
 var ConvertWorker = __webpack_require__(904);
 var GenericWorker = __webpack_require__(186);
 var base64 = __webpack_require__(729);
-var support = __webpack_require__(188);
+var support = __webpack_require__(546);
 var external = __webpack_require__(857);
 
 var NodejsStreamOutputAdapter = null;
@@ -13737,12 +11085,8 @@ module.exports = StreamHelper;
 
 
 /***/ }),
-/* 239 */,
-/* 240 */,
-/* 241 */,
-/* 242 */,
-/* 243 */,
-/* 244 */
+
+/***/ 244:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -13882,7 +11226,8 @@ module.exports = ZipObject;
 
 
 /***/ }),
-/* 245 */
+
+/***/ 245:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -13901,7 +11246,8 @@ module.exports = outputJsonSync
 
 
 /***/ }),
-/* 246 */
+
+/***/ 246:
 /***/ (function(module) {
 
 "use strict";
@@ -13919,46 +11265,8 @@ module.exports = function isAxiosError(payload) {
 
 
 /***/ }),
-/* 247 */,
-/* 248 */
-/***/ (function(module) {
 
-// Note: this is the semver.org version of the spec that it implements
-// Not necessarily the package version of this code.
-const SEMVER_SPEC_VERSION = '2.0.0'
-
-const MAX_LENGTH = 256
-const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER ||
-  /* istanbul ignore next */ 9007199254740991
-
-// Max safe segment length for coercion.
-const MAX_SAFE_COMPONENT_LENGTH = 16
-
-module.exports = {
-  SEMVER_SPEC_VERSION,
-  MAX_LENGTH,
-  MAX_SAFE_INTEGER,
-  MAX_SAFE_COMPONENT_LENGTH
-}
-
-
-/***/ }),
-/* 249 */,
-/* 250 */,
-/* 251 */,
-/* 252 */,
-/* 253 */,
-/* 254 */,
-/* 255 */,
-/* 256 */,
-/* 257 */,
-/* 258 */,
-/* 259 */,
-/* 260 */,
-/* 261 */,
-/* 262 */,
-/* 263 */,
-/* 264 */
+/***/ 264:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -14354,28 +11662,8 @@ module.exports = out;
 
 
 /***/ }),
-/* 265 */,
-/* 266 */,
-/* 267 */,
-/* 268 */,
-/* 269 */,
-/* 270 */,
-/* 271 */,
-/* 272 */,
-/* 273 */,
-/* 274 */,
-/* 275 */,
-/* 276 */,
-/* 277 */,
-/* 278 */,
-/* 279 */,
-/* 280 */,
-/* 281 */,
-/* 282 */,
-/* 283 */,
-/* 284 */,
-/* 285 */,
-/* 286 */
+
+/***/ 286:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -14481,19 +11769,15 @@ module.exports = {
 
 
 /***/ }),
-/* 287 */,
-/* 288 */,
-/* 289 */,
-/* 290 */,
-/* 291 */,
-/* 292 */,
-/* 293 */
+
+/***/ 293:
 /***/ (function(module) {
 
 module.exports = require("buffer");
 
 /***/ }),
-/* 294 */
+
+/***/ 294:
 /***/ (function(module) {
 
 "use strict";
@@ -14532,9 +11816,8 @@ module.exports = {
 
 
 /***/ }),
-/* 295 */,
-/* 296 */,
-/* 297 */
+
+/***/ 297:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -14657,14 +11940,15 @@ module.exports = DataReader;
 
 
 /***/ }),
-/* 298 */
+
+/***/ 298:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
 
 var utils = __webpack_require__(901);
-var support = __webpack_require__(188);
+var support = __webpack_require__(546);
 var ArrayReader = __webpack_require__(44);
 var StringReader = __webpack_require__(160);
 var NodeBufferReader = __webpack_require__(108);
@@ -14692,10 +11976,8 @@ module.exports = function (data) {
 
 
 /***/ }),
-/* 299 */,
-/* 300 */,
-/* 301 */,
-/* 302 */
+
+/***/ 302:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 module.exports = minimatch
@@ -15624,18 +12906,8 @@ function regExpEscape (s) {
 
 
 /***/ }),
-/* 303 */,
-/* 304 */,
-/* 305 */,
-/* 306 */,
-/* 307 */,
-/* 308 */,
-/* 309 */,
-/* 310 */,
-/* 311 */,
-/* 312 */,
-/* 313 */,
-/* 314 */
+
+/***/ 314:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -15944,10 +13216,8 @@ rimraf.sync = rimrafSync
 
 
 /***/ }),
-/* 315 */,
-/* 316 */,
-/* 317 */,
-/* 318 */
+
+/***/ 318:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -16305,14 +13575,8 @@ module.exports = {
 
 
 /***/ }),
-/* 319 */,
-/* 320 */,
-/* 321 */,
-/* 322 */,
-/* 323 */,
-/* 324 */,
-/* 325 */,
-/* 326 */
+
+/***/ 326:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -16339,7 +13603,7 @@ module.exports = {
 
 var utils         = __webpack_require__(33);
 var adler32       = __webpack_require__(742);
-var crc32         = __webpack_require__(46);
+var crc32         = __webpack_require__(630);
 var inflate_fast  = __webpack_require__(780);
 var inflate_table = __webpack_require__(730);
 
@@ -17875,9 +15139,8 @@ exports.inflateUndermine = inflateUndermine;
 
 
 /***/ }),
-/* 327 */,
-/* 328 */,
-/* 329 */
+
+/***/ 329:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -17930,7 +15193,7 @@ var util = Object.create(__webpack_require__(490));
 util.inherits = __webpack_require__(476);
 /*</replacement>*/
 
-var Readable = __webpack_require__(934);
+var Readable = __webpack_require__(188);
 var Writable = __webpack_require__(708);
 
 util.inherits(Duplex, Readable);
@@ -18014,12 +15277,8 @@ Duplex.prototype._destroy = function (err, cb) {
 };
 
 /***/ }),
-/* 330 */,
-/* 331 */,
-/* 332 */,
-/* 333 */,
-/* 334 */,
-/* 335 */
+
+/***/ 335:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 const assert = __webpack_require__(59)
@@ -18385,19 +15644,15 @@ rimraf.sync = rimrafSync
 
 
 /***/ }),
-/* 336 */,
-/* 337 */,
-/* 338 */,
-/* 339 */,
-/* 340 */,
-/* 341 */
+
+/***/ 341:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
 
 
 var utils = __webpack_require__(901);
-var support = __webpack_require__(188);
+var support = __webpack_require__(546);
 var nodejsUtils = __webpack_require__(347);
 var GenericWorker = __webpack_require__(186);
 
@@ -18672,12 +15927,8 @@ exports.Utf8EncodeWorker = Utf8EncodeWorker;
 
 
 /***/ }),
-/* 342 */,
-/* 343 */,
-/* 344 */,
-/* 345 */,
-/* 346 */,
-/* 347 */
+
+/***/ 347:
 /***/ (function(module) {
 
 "use strict";
@@ -18741,16 +15992,8 @@ module.exports = {
 
 
 /***/ }),
-/* 348 */,
-/* 349 */,
-/* 350 */,
-/* 351 */,
-/* 352 */,
-/* 353 */,
-/* 354 */,
-/* 355 */,
-/* 356 */,
-/* 357 */
+
+/***/ 357:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -18994,632 +16237,15 @@ exports.getState = getState;
 //# sourceMappingURL=core.js.map
 
 /***/ }),
-/* 358 */,
-/* 359 */,
-/* 360 */,
-/* 361 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-
-const color = __webpack_require__(492);
-const is = __webpack_require__(64);
-
-/**
- * Rotate the output image by either an explicit angle
- * or auto-orient based on the EXIF `Orientation` tag.
- *
- * If an angle is provided, it is converted to a valid positive degree rotation.
- * For example, `-450` will produce a 270deg rotation.
- *
- * When rotating by an angle other than a multiple of 90,
- * the background colour can be provided with the `background` option.
- *
- * If no angle is provided, it is determined from the EXIF data.
- * Mirroring is supported and may infer the use of a flip operation.
- *
- * The use of `rotate` implies the removal of the EXIF `Orientation` tag, if any.
- *
- * Method order is important when both rotating and extracting regions,
- * for example `rotate(x).extract(y)` will produce a different result to `extract(y).rotate(x)`.
- *
- * @example
- * const pipeline = sharp()
- *   .rotate()
- *   .resize(null, 200)
- *   .toBuffer(function (err, outputBuffer, info) {
- *     // outputBuffer contains 200px high JPEG image data,
- *     // auto-rotated using EXIF Orientation tag
- *     // info.width and info.height contain the dimensions of the resized image
- *   });
- * readableStream.pipe(pipeline);
- *
- * @param {number} [angle=auto] angle of rotation.
- * @param {Object} [options] - if present, is an Object with optional attributes.
- * @param {string|Object} [options.background="#000000"] parsed by the [color](https://www.npmjs.org/package/color) module to extract values for red, green, blue and alpha.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function rotate (angle, options) {
-  if (!is.defined(angle)) {
-    this.options.useExifOrientation = true;
-  } else if (is.integer(angle) && !(angle % 90)) {
-    this.options.angle = angle;
-  } else if (is.number(angle)) {
-    this.options.rotationAngle = angle;
-    if (is.object(options) && options.background) {
-      const backgroundColour = color(options.background);
-      this.options.rotationBackground = [
-        backgroundColour.red(),
-        backgroundColour.green(),
-        backgroundColour.blue(),
-        Math.round(backgroundColour.alpha() * 255)
-      ];
-    }
-  } else {
-    throw is.invalidParameterError('angle', 'numeric', angle);
-  }
-  return this;
-}
-
-/**
- * Flip the image about the vertical Y axis. This always occurs after rotation, if any.
- * The use of `flip` implies the removal of the EXIF `Orientation` tag, if any.
- * @param {Boolean} [flip=true]
- * @returns {Sharp}
- */
-function flip (flip) {
-  this.options.flip = is.bool(flip) ? flip : true;
-  return this;
-}
-
-/**
- * Flop the image about the horizontal X axis. This always occurs after rotation, if any.
- * The use of `flop` implies the removal of the EXIF `Orientation` tag, if any.
- * @param {Boolean} [flop=true]
- * @returns {Sharp}
- */
-function flop (flop) {
-  this.options.flop = is.bool(flop) ? flop : true;
-  return this;
-}
-
-/**
- * Perform an affine transform on an image. This operation will always occur after resizing, extraction and rotation, if any.
- *
- * You must provide an array of length 4 or a 2x2 affine transformation matrix.
- * By default, new pixels are filled with a black background. You can provide a background color with the `background` option.
- * A particular interpolator may also be specified. Set the `interpolator` option to an attribute of the `sharp.interpolator` Object e.g. `sharp.interpolator.nohalo`.
- *
- * In the case of a 2x2 matrix, the transform is:
- * - X = `matrix[0, 0]` \* (x + `idx`) + `matrix[0, 1]` \* (y + `idy`) + `odx`
- * - Y = `matrix[1, 0]` \* (x + `idx`) + `matrix[1, 1]` \* (y + `idy`) + `ody`
- *
- * where:
- * - x and y are the coordinates in input image.
- * - X and Y are the coordinates in output image.
- * - (0,0) is the upper left corner.
- *
- * @since 0.27.0
- *
- * @example
- * const pipeline = sharp()
- *   .affine([[1, 0.3], [0.1, 0.7]], {
- *      background: 'white',
- *      interpolate: sharp.interpolators.nohalo
- *   })
- *   .toBuffer((err, outputBuffer, info) => {
- *      // outputBuffer contains the transformed image
- *      // info.width and info.height contain the new dimensions
- *   });
- *
- * inputStream
- *   .pipe(pipeline);
- *
- * @param {Array<Array<number>>|Array<number>} matrix - affine transformation matrix
- * @param {Object} [options] - if present, is an Object with optional attributes.
- * @param {String|Object} [options.background="#000000"] - parsed by the [color](https://www.npmjs.org/package/color) module to extract values for red, green, blue and alpha.
- * @param {Number} [options.idx=0] - input horizontal offset
- * @param {Number} [options.idy=0] - input vertical offset
- * @param {Number} [options.odx=0] - output horizontal offset
- * @param {Number} [options.ody=0] - output vertical offset
- * @param {String} [options.interpolator=sharp.interpolators.bicubic] - interpolator
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function affine (matrix, options) {
-  const flatMatrix = [].concat(...matrix);
-  if (flatMatrix.length === 4 && flatMatrix.every(is.number)) {
-    this.options.affineMatrix = flatMatrix;
-  } else {
-    throw is.invalidParameterError('matrix', '1x4 or 2x2 array', matrix);
-  }
-
-  if (is.defined(options)) {
-    if (is.object(options)) {
-      this._setBackgroundColourOption('affineBackground', options.background);
-      if (is.defined(options.idx)) {
-        if (is.number(options.idx)) {
-          this.options.affineIdx = options.idx;
-        } else {
-          throw is.invalidParameterError('options.idx', 'number', options.idx);
-        }
-      }
-      if (is.defined(options.idy)) {
-        if (is.number(options.idy)) {
-          this.options.affineIdy = options.idy;
-        } else {
-          throw is.invalidParameterError('options.idy', 'number', options.idy);
-        }
-      }
-      if (is.defined(options.odx)) {
-        if (is.number(options.odx)) {
-          this.options.affineOdx = options.odx;
-        } else {
-          throw is.invalidParameterError('options.odx', 'number', options.odx);
-        }
-      }
-      if (is.defined(options.ody)) {
-        if (is.number(options.ody)) {
-          this.options.affineOdy = options.ody;
-        } else {
-          throw is.invalidParameterError('options.ody', 'number', options.ody);
-        }
-      }
-      if (is.defined(options.interpolator)) {
-        if (is.inArray(options.interpolator, Object.values(this.constructor.interpolators))) {
-          this.options.affineInterpolator = options.interpolator;
-        } else {
-          throw is.invalidParameterError('options.interpolator', 'valid interpolator name', options.interpolator);
-        }
-      }
-    } else {
-      throw is.invalidParameterError('options', 'object', options);
-    }
-  }
-
-  return this;
-}
-
-/**
- * Sharpen the image.
- * When used without parameters, performs a fast, mild sharpen of the output image.
- * When a `sigma` is provided, performs a slower, more accurate sharpen of the L channel in the LAB colour space.
- * Separate control over the level of sharpening in "flat" and "jagged" areas is available.
- *
- * @param {number} [sigma] - the sigma of the Gaussian mask, where `sigma = 1 + radius / 2`.
- * @param {number} [flat=1.0] - the level of sharpening to apply to "flat" areas.
- * @param {number} [jagged=2.0] - the level of sharpening to apply to "jagged" areas.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function sharpen (sigma, flat, jagged) {
-  if (!is.defined(sigma)) {
-    // No arguments: default to mild sharpen
-    this.options.sharpenSigma = -1;
-  } else if (is.bool(sigma)) {
-    // Boolean argument: apply mild sharpen?
-    this.options.sharpenSigma = sigma ? -1 : 0;
-  } else if (is.number(sigma) && is.inRange(sigma, 0.01, 10000)) {
-    // Numeric argument: specific sigma
-    this.options.sharpenSigma = sigma;
-    // Control over flat areas
-    if (is.defined(flat)) {
-      if (is.number(flat) && is.inRange(flat, 0, 10000)) {
-        this.options.sharpenFlat = flat;
-      } else {
-        throw is.invalidParameterError('flat', 'number between 0 and 10000', flat);
-      }
-    }
-    // Control over jagged areas
-    if (is.defined(jagged)) {
-      if (is.number(jagged) && is.inRange(jagged, 0, 10000)) {
-        this.options.sharpenJagged = jagged;
-      } else {
-        throw is.invalidParameterError('jagged', 'number between 0 and 10000', jagged);
-      }
-    }
-  } else {
-    throw is.invalidParameterError('sigma', 'number between 0.01 and 10000', sigma);
-  }
-  return this;
-}
-
-/**
- * Apply median filter.
- * When used without parameters the default window is 3x3.
- * @param {number} [size=3] square mask size: size x size
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function median (size) {
-  if (!is.defined(size)) {
-    // No arguments: default to 3x3
-    this.options.medianSize = 3;
-  } else if (is.integer(size) && is.inRange(size, 1, 1000)) {
-    // Numeric argument: specific sigma
-    this.options.medianSize = size;
-  } else {
-    throw is.invalidParameterError('size', 'integer between 1 and 1000', size);
-  }
-  return this;
-}
-
-/**
- * Blur the image.
- * When used without parameters, performs a fast, mild blur of the output image.
- * When a `sigma` is provided, performs a slower, more accurate Gaussian blur.
- * @param {number} [sigma] a value between 0.3 and 1000 representing the sigma of the Gaussian mask, where `sigma = 1 + radius / 2`.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function blur (sigma) {
-  if (!is.defined(sigma)) {
-    // No arguments: default to mild blur
-    this.options.blurSigma = -1;
-  } else if (is.bool(sigma)) {
-    // Boolean argument: apply mild blur?
-    this.options.blurSigma = sigma ? -1 : 0;
-  } else if (is.number(sigma) && is.inRange(sigma, 0.3, 1000)) {
-    // Numeric argument: specific sigma
-    this.options.blurSigma = sigma;
-  } else {
-    throw is.invalidParameterError('sigma', 'number between 0.3 and 1000', sigma);
-  }
-  return this;
-}
-
-/**
- * Merge alpha transparency channel, if any, with a background, then remove the alpha channel.
- *
- * @example
- * await sharp(rgbaInput)
- *   .flatten('#F0A703')
- *   .toBuffer();
- *
- * @param {Object} [options]
- * @param {string|Object} [options.background={r: 0, g: 0, b: 0}] - background colour, parsed by the [color](https://www.npmjs.org/package/color) module, defaults to black.
- * @returns {Sharp}
- */
-function flatten (options) {
-  this.options.flatten = is.bool(options) ? options : true;
-  if (is.object(options)) {
-    this._setBackgroundColourOption('flattenBackground', options.background);
-  }
-  return this;
-}
-
-/**
- * Apply a gamma correction by reducing the encoding (darken) pre-resize at a factor of `1/gamma`
- * then increasing the encoding (brighten) post-resize at a factor of `gamma`.
- * This can improve the perceived brightness of a resized image in non-linear colour spaces.
- * JPEG and WebP input images will not take advantage of the shrink-on-load performance optimisation
- * when applying a gamma correction.
- *
- * Supply a second argument to use a different output gamma value, otherwise the first value is used in both cases.
- *
- * @param {number} [gamma=2.2] value between 1.0 and 3.0.
- * @param {number} [gammaOut] value between 1.0 and 3.0. (optional, defaults to same as `gamma`)
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function gamma (gamma, gammaOut) {
-  if (!is.defined(gamma)) {
-    // Default gamma correction of 2.2 (sRGB)
-    this.options.gamma = 2.2;
-  } else if (is.number(gamma) && is.inRange(gamma, 1, 3)) {
-    this.options.gamma = gamma;
-  } else {
-    throw is.invalidParameterError('gamma', 'number between 1.0 and 3.0', gamma);
-  }
-  if (!is.defined(gammaOut)) {
-    // Default gamma correction for output is same as input
-    this.options.gammaOut = this.options.gamma;
-  } else if (is.number(gammaOut) && is.inRange(gammaOut, 1, 3)) {
-    this.options.gammaOut = gammaOut;
-  } else {
-    throw is.invalidParameterError('gammaOut', 'number between 1.0 and 3.0', gammaOut);
-  }
-  return this;
-}
-
-/**
- * Produce the "negative" of the image.
- * @param {Boolean} [negate=true]
- * @returns {Sharp}
- */
-function negate (negate) {
-  this.options.negate = is.bool(negate) ? negate : true;
-  return this;
-}
-
-/**
- * Enhance output image contrast by stretching its luminance to cover the full dynamic range.
- * @param {Boolean} [normalise=true]
- * @returns {Sharp}
- */
-function normalise (normalise) {
-  this.options.normalise = is.bool(normalise) ? normalise : true;
-  return this;
-}
-
-/**
- * Alternative spelling of normalise.
- * @param {Boolean} [normalize=true]
- * @returns {Sharp}
- */
-function normalize (normalize) {
-  return this.normalise(normalize);
-}
-
-/**
- * Convolve the image with the specified kernel.
- *
- * @example
- * sharp(input)
- *   .convolve({
- *     width: 3,
- *     height: 3,
- *     kernel: [-1, 0, 1, -2, 0, 2, -1, 0, 1]
- *   })
- *   .raw()
- *   .toBuffer(function(err, data, info) {
- *     // data contains the raw pixel data representing the convolution
- *     // of the input image with the horizontal Sobel operator
- *   });
- *
- * @param {Object} kernel
- * @param {number} kernel.width - width of the kernel in pixels.
- * @param {number} kernel.height - width of the kernel in pixels.
- * @param {Array<number>} kernel.kernel - Array of length `width*height` containing the kernel values.
- * @param {number} [kernel.scale=sum] - the scale of the kernel in pixels.
- * @param {number} [kernel.offset=0] - the offset of the kernel in pixels.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function convolve (kernel) {
-  if (!is.object(kernel) || !Array.isArray(kernel.kernel) ||
-      !is.integer(kernel.width) || !is.integer(kernel.height) ||
-      !is.inRange(kernel.width, 3, 1001) || !is.inRange(kernel.height, 3, 1001) ||
-      kernel.height * kernel.width !== kernel.kernel.length
-  ) {
-    // must pass in a kernel
-    throw new Error('Invalid convolution kernel');
-  }
-  // Default scale is sum of kernel values
-  if (!is.integer(kernel.scale)) {
-    kernel.scale = kernel.kernel.reduce(function (a, b) {
-      return a + b;
-    }, 0);
-  }
-  // Clip scale to a minimum value of 1
-  if (kernel.scale < 1) {
-    kernel.scale = 1;
-  }
-  if (!is.integer(kernel.offset)) {
-    kernel.offset = 0;
-  }
-  this.options.convKernel = kernel;
-  return this;
-}
-
-/**
- * Any pixel value greater than or equal to the threshold value will be set to 255, otherwise it will be set to 0.
- * @param {number} [threshold=128] - a value in the range 0-255 representing the level at which the threshold will be applied.
- * @param {Object} [options]
- * @param {Boolean} [options.greyscale=true] - convert to single channel greyscale.
- * @param {Boolean} [options.grayscale=true] - alternative spelling for greyscale.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function threshold (threshold, options) {
-  if (!is.defined(threshold)) {
-    this.options.threshold = 128;
-  } else if (is.bool(threshold)) {
-    this.options.threshold = threshold ? 128 : 0;
-  } else if (is.integer(threshold) && is.inRange(threshold, 0, 255)) {
-    this.options.threshold = threshold;
-  } else {
-    throw is.invalidParameterError('threshold', 'integer between 0 and 255', threshold);
-  }
-  if (!is.object(options) || options.greyscale === true || options.grayscale === true) {
-    this.options.thresholdGrayscale = true;
-  } else {
-    this.options.thresholdGrayscale = false;
-  }
-  return this;
-}
-
-/**
- * Perform a bitwise boolean operation with operand image.
- *
- * This operation creates an output image where each pixel is the result of
- * the selected bitwise boolean `operation` between the corresponding pixels of the input images.
- *
- * @param {Buffer|string} operand - Buffer containing image data or string containing the path to an image file.
- * @param {string} operator - one of `and`, `or` or `eor` to perform that bitwise operation, like the C logic operators `&`, `|` and `^` respectively.
- * @param {Object} [options]
- * @param {Object} [options.raw] - describes operand when using raw pixel data.
- * @param {number} [options.raw.width]
- * @param {number} [options.raw.height]
- * @param {number} [options.raw.channels]
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function boolean (operand, operator, options) {
-  this.options.boolean = this._createInputDescriptor(operand, options);
-  if (is.string(operator) && is.inArray(operator, ['and', 'or', 'eor'])) {
-    this.options.booleanOp = operator;
-  } else {
-    throw is.invalidParameterError('operator', 'one of: and, or, eor', operator);
-  }
-  return this;
-}
-
-/**
- * Apply the linear formula a * input + b to the image (levels adjustment)
- * @param {number} [a=1.0] multiplier
- * @param {number} [b=0.0] offset
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function linear (a, b) {
-  if (!is.defined(a)) {
-    this.options.linearA = 1.0;
-  } else if (is.number(a)) {
-    this.options.linearA = a;
-  } else {
-    throw is.invalidParameterError('a', 'numeric', a);
-  }
-  if (!is.defined(b)) {
-    this.options.linearB = 0.0;
-  } else if (is.number(b)) {
-    this.options.linearB = b;
-  } else {
-    throw is.invalidParameterError('b', 'numeric', b);
-  }
-  return this;
-}
-
-/**
- * Recomb the image with the specified matrix.
- *
- * @since 0.21.1
- *
- * @example
- * sharp(input)
- *   .recomb([
- *    [0.3588, 0.7044, 0.1368],
- *    [0.2990, 0.5870, 0.1140],
- *    [0.2392, 0.4696, 0.0912],
- *   ])
- *   .raw()
- *   .toBuffer(function(err, data, info) {
- *     // data contains the raw pixel data after applying the recomb
- *     // With this example input, a sepia filter has been applied
- *   });
- *
- * @param {Array<Array<number>>} inputMatrix - 3x3 Recombination matrix
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function recomb (inputMatrix) {
-  if (!Array.isArray(inputMatrix) || inputMatrix.length !== 3 ||
-      inputMatrix[0].length !== 3 ||
-      inputMatrix[1].length !== 3 ||
-      inputMatrix[2].length !== 3
-  ) {
-    // must pass in a kernel
-    throw new Error('Invalid recombination matrix');
-  }
-  this.options.recombMatrix = [
-    inputMatrix[0][0], inputMatrix[0][1], inputMatrix[0][2],
-    inputMatrix[1][0], inputMatrix[1][1], inputMatrix[1][2],
-    inputMatrix[2][0], inputMatrix[2][1], inputMatrix[2][2]
-  ].map(Number);
-  return this;
-}
-
-/**
- * Transforms the image using brightness, saturation and hue rotation.
- *
- * @since 0.22.1
- *
- * @example
- * sharp(input)
- *   .modulate({
- *     brightness: 2 // increase lightness by a factor of 2
- *   });
- *
- * sharp(input)
- *   .modulate({
- *     hue: 180 // hue-rotate by 180 degrees
- *   });
- *
- * // decreate brightness and saturation while also hue-rotating by 90 degrees
- * sharp(input)
- *   .modulate({
- *     brightness: 0.5,
- *     saturation: 0.5,
- *     hue: 90
- *   });
- *
- * @param {Object} [options]
- * @param {number} [options.brightness] Brightness multiplier
- * @param {number} [options.saturation] Saturation multiplier
- * @param {number} [options.hue] Degrees for hue rotation
- * @returns {Sharp}
- */
-function modulate (options) {
-  if (!is.plainObject(options)) {
-    throw is.invalidParameterError('options', 'plain object', options);
-  }
-  if ('brightness' in options) {
-    if (is.number(options.brightness) && options.brightness >= 0) {
-      this.options.brightness = options.brightness;
-    } else {
-      throw is.invalidParameterError('brightness', 'number above zero', options.brightness);
-    }
-  }
-  if ('saturation' in options) {
-    if (is.number(options.saturation) && options.saturation >= 0) {
-      this.options.saturation = options.saturation;
-    } else {
-      throw is.invalidParameterError('saturation', 'number above zero', options.saturation);
-    }
-  }
-  if ('hue' in options) {
-    if (is.integer(options.hue)) {
-      this.options.hue = options.hue % 360;
-    } else {
-      throw is.invalidParameterError('hue', 'number', options.hue);
-    }
-  }
-  return this;
-}
-
-/**
- * Decorate the Sharp prototype with operation-related functions.
- * @private
- */
-module.exports = function (Sharp) {
-  Object.assign(Sharp.prototype, {
-    rotate,
-    flip,
-    flop,
-    affine,
-    sharpen,
-    median,
-    blur,
-    flatten,
-    gamma,
-    negate,
-    normalise,
-    normalize,
-    convolve,
-    threshold,
-    boolean,
-    linear,
-    recomb,
-    modulate
-  });
-};
-
-
-/***/ }),
-/* 362 */,
-/* 363 */,
-/* 364 */,
-/* 365 */,
-/* 366 */
+/***/ 366:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 module.exports = __webpack_require__(847);
 
 /***/ }),
-/* 367 */,
-/* 368 */
+
+/***/ 368:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 
@@ -19631,9 +16257,8 @@ module.exports = __webpack_require__(669).deprecate;
 
 
 /***/ }),
-/* 369 */,
-/* 370 */,
-/* 371 */
+
+/***/ 371:
 /***/ (function(module) {
 
 function stringify (obj, { EOL = '\n', finalEOL = true, replacer = null, spaces } = {}) {
@@ -19653,44 +16278,8 @@ module.exports = { stringify, stripBom }
 
 
 /***/ }),
-/* 372 */,
-/* 373 */,
-/* 374 */,
-/* 375 */,
-/* 376 */,
-/* 377 */,
-/* 378 */,
-/* 379 */,
-/* 380 */,
-/* 381 */,
-/* 382 */,
-/* 383 */,
-/* 384 */
-/***/ (function(module) {
 
-var toString = {}.toString;
-
-module.exports = Array.isArray || function (arr) {
-  return toString.call(arr) == '[object Array]';
-};
-
-
-/***/ }),
-/* 385 */,
-/* 386 */,
-/* 387 */,
-/* 388 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-const compare = __webpack_require__(233)
-const rcompare = (a, b, loose) => compare(b, a, loose)
-module.exports = rcompare
-
-
-/***/ }),
-/* 389 */,
-/* 390 */,
-/* 391 */
+/***/ 391:
 /***/ (function(module) {
 
 "use strict";
@@ -19742,9 +16331,8 @@ function nextTick(fn, arg1, arg2, arg3) {
 
 
 /***/ }),
-/* 392 */,
-/* 393 */,
-/* 394 */
+
+/***/ 394:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -20046,10 +16634,8 @@ function simpleEnd(buf) {
 }
 
 /***/ }),
-/* 395 */,
-/* 396 */,
-/* 397 */,
-/* 398 */
+
+/***/ 398:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -20103,120 +16689,15 @@ module.exports = moveSync
 
 
 /***/ }),
-/* 399 */,
-/* 400 */,
-/* 401 */,
-/* 402 */,
-/* 403 */,
-/* 404 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const SemVer = __webpack_require__(82)
-const Comparator = __webpack_require__(960)
-const {ANY} = Comparator
-const Range = __webpack_require__(174)
-const satisfies = __webpack_require__(953)
-const gt = __webpack_require__(180)
-const lt = __webpack_require__(25)
-const lte = __webpack_require__(125)
-const gte = __webpack_require__(140)
-
-const outside = (version, range, hilo, options) => {
-  version = new SemVer(version, options)
-  range = new Range(range, options)
-
-  let gtfn, ltefn, ltfn, comp, ecomp
-  switch (hilo) {
-    case '>':
-      gtfn = gt
-      ltefn = lte
-      ltfn = lt
-      comp = '>'
-      ecomp = '>='
-      break
-    case '<':
-      gtfn = lt
-      ltefn = gte
-      ltfn = gt
-      comp = '<'
-      ecomp = '<='
-      break
-    default:
-      throw new TypeError('Must provide a hilo val of "<" or ">"')
-  }
-
-  // If it satisfies the range it is not outside
-  if (satisfies(version, range, options)) {
-    return false
-  }
-
-  // From now on, variable terms are as if we're in "gtr" mode.
-  // but note that everything is flipped for the "ltr" function.
-
-  for (let i = 0; i < range.set.length; ++i) {
-    const comparators = range.set[i]
-
-    let high = null
-    let low = null
-
-    comparators.forEach((comparator) => {
-      if (comparator.semver === ANY) {
-        comparator = new Comparator('>=0.0.0')
-      }
-      high = high || comparator
-      low = low || comparator
-      if (gtfn(comparator.semver, high.semver, options)) {
-        high = comparator
-      } else if (ltfn(comparator.semver, low.semver, options)) {
-        low = comparator
-      }
-    })
-
-    // If the edge version comparator has a operator then our version
-    // isn't outside it
-    if (high.operator === comp || high.operator === ecomp) {
-      return false
-    }
-
-    // If the lowest version comparator has an operator and our version
-    // is less than it then it isn't higher than the range
-    if ((!low.operator || low.operator === comp) &&
-        ltefn(version, low.semver)) {
-      return false
-    } else if (low.operator === ecomp && ltfn(version, low.semver)) {
-      return false
-    }
-  }
-  return true
-}
-
-module.exports = outside
-
-
-/***/ }),
-/* 405 */,
-/* 406 */,
-/* 407 */,
-/* 408 */,
-/* 409 */,
-/* 410 */,
-/* 411 */,
-/* 412 */,
-/* 413 */
+/***/ 413:
 /***/ (function(module) {
 
 module.exports = require("stream");
 
 /***/ }),
-/* 414 */,
-/* 415 */,
-/* 416 */,
-/* 417 */,
-/* 418 */,
-/* 419 */,
-/* 420 */,
-/* 421 */,
-/* 422 */
+
+/***/ 422:
 /***/ (function(module) {
 
 var dotize = {
@@ -20424,67 +16905,20 @@ module.exports = dotize
 
 
 /***/ }),
-/* 423 */,
-/* 424 */,
-/* 425 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const eq = __webpack_require__(12)
-const neq = __webpack_require__(796)
-const gt = __webpack_require__(180)
-const gte = __webpack_require__(140)
-const lt = __webpack_require__(25)
-const lte = __webpack_require__(125)
+/***/ 425:
+/***/ (function(module) {
 
-const cmp = (a, op, b, loose) => {
-  switch (op) {
-    case '===':
-      if (typeof a === 'object')
-        a = a.version
-      if (typeof b === 'object')
-        b = b.version
-      return a === b
+var toString = {}.toString;
 
-    case '!==':
-      if (typeof a === 'object')
-        a = a.version
-      if (typeof b === 'object')
-        b = b.version
-      return a !== b
-
-    case '':
-    case '=':
-    case '==':
-      return eq(a, b, loose)
-
-    case '!=':
-      return neq(a, b, loose)
-
-    case '>':
-      return gt(a, b, loose)
-
-    case '>=':
-      return gte(a, b, loose)
-
-    case '<':
-      return lt(a, b, loose)
-
-    case '<=':
-      return lte(a, b, loose)
-
-    default:
-      throw new TypeError(`Invalid operator: ${op}`)
-  }
-}
-module.exports = cmp
+module.exports = Array.isArray || function (arr) {
+  return toString.call(arr) == '[object Array]';
+};
 
 
 /***/ }),
-/* 426 */,
-/* 427 */,
-/* 428 */,
-/* 429 */,
-/* 430 */
+
+/***/ 430:
 /***/ (function(module) {
 
 "use strict";
@@ -20518,506 +16952,278 @@ module.exports = function spread(callback) {
 
 
 /***/ }),
-/* 431 */,
-/* 432 */,
-/* 433 */,
-/* 434 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const SemVer = __webpack_require__(82)
-const Range = __webpack_require__(174)
-
-const maxSatisfying = (versions, range, options) => {
-  let max = null
-  let maxSV = null
-  let rangeObj = null
-  try {
-    rangeObj = new Range(range, options)
-  } catch (er) {
-    return null
-  }
-  versions.forEach((v) => {
-    if (rangeObj.test(v)) {
-      // satisfies(v, range, options)
-      if (!max || maxSV.compare(v) === -1) {
-        // compare(max, v, true)
-        max = v
-        maxSV = new SemVer(max, options)
-      }
-    }
-  })
-  return max
-}
-module.exports = maxSatisfying
-
-
-/***/ }),
-/* 435 */,
-/* 436 */,
-/* 437 */
+/***/ 437:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
-
-const is = __webpack_require__(64);
-
+var readerFor = __webpack_require__(298);
+var utils = __webpack_require__(901);
+var sig = __webpack_require__(150);
+var ZipEntry = __webpack_require__(21);
+var utf8 = __webpack_require__(341);
+var support = __webpack_require__(546);
+//  class ZipEntries {{{
 /**
- * Weighting to apply when using contain/cover fit.
- * @member
- * @private
+ * All the entries in the zip file.
+ * @constructor
+ * @param {Object} loadOptions Options for loading the stream.
  */
-const gravity = {
-  center: 0,
-  centre: 0,
-  north: 1,
-  east: 2,
-  south: 3,
-  west: 4,
-  northeast: 5,
-  southeast: 6,
-  southwest: 7,
-  northwest: 8
-};
-
-/**
- * Position to apply when using contain/cover fit.
- * @member
- * @private
- */
-const position = {
-  top: 1,
-  right: 2,
-  bottom: 3,
-  left: 4,
-  'right top': 5,
-  'right bottom': 6,
-  'left bottom': 7,
-  'left top': 8
-};
-
-/**
- * Strategies for automagic cover behaviour.
- * @member
- * @private
- */
-const strategy = {
-  entropy: 16,
-  attention: 17
-};
-
-/**
- * Reduction kernels.
- * @member
- * @private
- */
-const kernel = {
-  nearest: 'nearest',
-  cubic: 'cubic',
-  mitchell: 'mitchell',
-  lanczos2: 'lanczos2',
-  lanczos3: 'lanczos3'
-};
-
-/**
- * Methods by which an image can be resized to fit the provided dimensions.
- * @member
- * @private
- */
-const fit = {
-  contain: 'contain',
-  cover: 'cover',
-  fill: 'fill',
-  inside: 'inside',
-  outside: 'outside'
-};
-
-/**
- * Map external fit property to internal canvas property.
- * @member
- * @private
- */
-const mapFitToCanvas = {
-  contain: 'embed',
-  cover: 'crop',
-  fill: 'ignore_aspect',
-  inside: 'max',
-  outside: 'min'
-};
-
-/**
- * @private
- */
-function isRotationExpected (options) {
-  return (options.angle % 360) !== 0 || options.useExifOrientation === true || options.rotationAngle !== 0;
+function ZipEntries(loadOptions) {
+    this.files = [];
+    this.loadOptions = loadOptions;
 }
+ZipEntries.prototype = {
+    /**
+     * Check that the reader is on the specified signature.
+     * @param {string} expectedSignature the expected signature.
+     * @throws {Error} if it is an other signature.
+     */
+    checkSignature: function(expectedSignature) {
+        if (!this.reader.readAndCheckSignature(expectedSignature)) {
+            this.reader.index -= 4;
+            var signature = this.reader.readString(4);
+            throw new Error("Corrupted zip or bug: unexpected signature " + "(" + utils.pretty(signature) + ", expected " + utils.pretty(expectedSignature) + ")");
+        }
+    },
+    /**
+     * Check if the given signature is at the given index.
+     * @param {number} askedIndex the index to check.
+     * @param {string} expectedSignature the signature to expect.
+     * @return {boolean} true if the signature is here, false otherwise.
+     */
+    isSignature: function(askedIndex, expectedSignature) {
+        var currentIndex = this.reader.index;
+        this.reader.setIndex(askedIndex);
+        var signature = this.reader.readString(4);
+        var result = signature === expectedSignature;
+        this.reader.setIndex(currentIndex);
+        return result;
+    },
+    /**
+     * Read the end of the central directory.
+     */
+    readBlockEndOfCentral: function() {
+        this.diskNumber = this.reader.readInt(2);
+        this.diskWithCentralDirStart = this.reader.readInt(2);
+        this.centralDirRecordsOnThisDisk = this.reader.readInt(2);
+        this.centralDirRecords = this.reader.readInt(2);
+        this.centralDirSize = this.reader.readInt(4);
+        this.centralDirOffset = this.reader.readInt(4);
 
-/**
- * Resize image to `width`, `height` or `width x height`.
- *
- * When both a `width` and `height` are provided, the possible methods by which the image should **fit** these are:
- * - `cover`: (default) Preserving aspect ratio, ensure the image covers both provided dimensions by cropping/clipping to fit.
- * - `contain`: Preserving aspect ratio, contain within both provided dimensions using "letterboxing" where necessary.
- * - `fill`: Ignore the aspect ratio of the input and stretch to both provided dimensions.
- * - `inside`: Preserving aspect ratio, resize the image to be as large as possible while ensuring its dimensions are less than or equal to both those specified.
- * - `outside`: Preserving aspect ratio, resize the image to be as small as possible while ensuring its dimensions are greater than or equal to both those specified.
- *
- * Some of these values are based on the [object-fit](https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit) CSS property.
- *
- * When using a `fit` of `cover` or `contain`, the default **position** is `centre`. Other options are:
- * - `sharp.position`: `top`, `right top`, `right`, `right bottom`, `bottom`, `left bottom`, `left`, `left top`.
- * - `sharp.gravity`: `north`, `northeast`, `east`, `southeast`, `south`, `southwest`, `west`, `northwest`, `center` or `centre`.
- * - `sharp.strategy`: `cover` only, dynamically crop using either the `entropy` or `attention` strategy.
- *
- * Some of these values are based on the [object-position](https://developer.mozilla.org/en-US/docs/Web/CSS/object-position) CSS property.
- *
- * The experimental strategy-based approach resizes so one dimension is at its target length
- * then repeatedly ranks edge regions, discarding the edge with the lowest score based on the selected strategy.
- * - `entropy`: focus on the region with the highest [Shannon entropy](https://en.wikipedia.org/wiki/Entropy_%28information_theory%29).
- * - `attention`: focus on the region with the highest luminance frequency, colour saturation and presence of skin tones.
- *
- * Possible interpolation kernels are:
- * - `nearest`: Use [nearest neighbour interpolation](http://en.wikipedia.org/wiki/Nearest-neighbor_interpolation).
- * - `cubic`: Use a [Catmull-Rom spline](https://en.wikipedia.org/wiki/Centripetal_Catmull%E2%80%93Rom_spline).
- * - `mitchell`: Use a [Mitchell-Netravali spline](https://www.cs.utexas.edu/~fussell/courses/cs384g-fall2013/lectures/mitchell/Mitchell.pdf).
- * - `lanczos2`: Use a [Lanczos kernel](https://en.wikipedia.org/wiki/Lanczos_resampling#Lanczos_kernel) with `a=2`.
- * - `lanczos3`: Use a Lanczos kernel with `a=3` (the default).
- *
- * @example
- * sharp(input)
- *   .resize({ width: 100 })
- *   .toBuffer()
- *   .then(data => {
- *     // 100 pixels wide, auto-scaled height
- *   });
- *
- * @example
- * sharp(input)
- *   .resize({ height: 100 })
- *   .toBuffer()
- *   .then(data => {
- *     // 100 pixels high, auto-scaled width
- *   });
- *
- * @example
- * sharp(input)
- *   .resize(200, 300, {
- *     kernel: sharp.kernel.nearest,
- *     fit: 'contain',
- *     position: 'right top',
- *     background: { r: 255, g: 255, b: 255, alpha: 0.5 }
- *   })
- *   .toFile('output.png')
- *   .then(() => {
- *     // output.png is a 200 pixels wide and 300 pixels high image
- *     // containing a nearest-neighbour scaled version
- *     // contained within the north-east corner of a semi-transparent white canvas
- *   });
- *
- * @example
- * const transformer = sharp()
- *   .resize({
- *     width: 200,
- *     height: 200,
- *     fit: sharp.fit.cover,
- *     position: sharp.strategy.entropy
- *   });
- * // Read image data from readableStream
- * // Write 200px square auto-cropped image data to writableStream
- * readableStream
- *   .pipe(transformer)
- *   .pipe(writableStream);
- *
- * @example
- * sharp(input)
- *   .resize(200, 200, {
- *     fit: sharp.fit.inside,
- *     withoutEnlargement: true
- *   })
- *   .toFormat('jpeg')
- *   .toBuffer()
- *   .then(function(outputBuffer) {
- *     // outputBuffer contains JPEG image data
- *     // no wider and no higher than 200 pixels
- *     // and no larger than the input image
- *   });
- *
- * @example
- * const scaleByHalf = await sharp(input)
- *   .metadata()
- *   .then(({ width }) => sharp(input)
- *     .resize(Math.round(width * 0.5))
- *     .toBuffer()
- *   );
- *
- * @param {number} [width] - pixels wide the resultant image should be. Use `null` or `undefined` to auto-scale the width to match the height.
- * @param {number} [height] - pixels high the resultant image should be. Use `null` or `undefined` to auto-scale the height to match the width.
- * @param {Object} [options]
- * @param {String} [options.width] - alternative means of specifying `width`. If both are present this take priority.
- * @param {String} [options.height] - alternative means of specifying `height`. If both are present this take priority.
- * @param {String} [options.fit='cover'] - how the image should be resized to fit both provided dimensions, one of `cover`, `contain`, `fill`, `inside` or `outside`.
- * @param {String} [options.position='centre'] - position, gravity or strategy to use when `fit` is `cover` or `contain`.
- * @param {String|Object} [options.background={r: 0, g: 0, b: 0, alpha: 1}] - background colour when using a `fit` of `contain`, parsed by the [color](https://www.npmjs.org/package/color) module, defaults to black without transparency.
- * @param {String} [options.kernel='lanczos3'] - the kernel to use for image reduction.
- * @param {Boolean} [options.withoutEnlargement=false] - do not enlarge if the width *or* height are already less than the specified dimensions, equivalent to GraphicsMagick's `>` geometry option.
- * @param {Boolean} [options.fastShrinkOnLoad=true] - take greater advantage of the JPEG and WebP shrink-on-load feature, which can lead to a slight moiré pattern on some images.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function resize (width, height, options) {
-  if (is.defined(width)) {
-    if (is.object(width) && !is.defined(options)) {
-      options = width;
-    } else if (is.integer(width) && width > 0) {
-      this.options.width = width;
-    } else {
-      throw is.invalidParameterError('width', 'positive integer', width);
-    }
-  } else {
-    this.options.width = -1;
-  }
-  if (is.defined(height)) {
-    if (is.integer(height) && height > 0) {
-      this.options.height = height;
-    } else {
-      throw is.invalidParameterError('height', 'positive integer', height);
-    }
-  } else {
-    this.options.height = -1;
-  }
-  if (is.object(options)) {
-    // Width
-    if (is.defined(options.width)) {
-      if (is.integer(options.width) && options.width > 0) {
-        this.options.width = options.width;
-      } else {
-        throw is.invalidParameterError('width', 'positive integer', options.width);
-      }
-    }
-    // Height
-    if (is.defined(options.height)) {
-      if (is.integer(options.height) && options.height > 0) {
-        this.options.height = options.height;
-      } else {
-        throw is.invalidParameterError('height', 'positive integer', options.height);
-      }
-    }
-    // Fit
-    if (is.defined(options.fit)) {
-      const canvas = mapFitToCanvas[options.fit];
-      if (is.string(canvas)) {
-        this.options.canvas = canvas;
-      } else {
-        throw is.invalidParameterError('fit', 'valid fit', options.fit);
-      }
-    }
-    // Position
-    if (is.defined(options.position)) {
-      const pos = is.integer(options.position)
-        ? options.position
-        : strategy[options.position] || position[options.position] || gravity[options.position];
-      if (is.integer(pos) && (is.inRange(pos, 0, 8) || is.inRange(pos, 16, 17))) {
-        this.options.position = pos;
-      } else {
-        throw is.invalidParameterError('position', 'valid position/gravity/strategy', options.position);
-      }
-    }
-    // Background
-    this._setBackgroundColourOption('resizeBackground', options.background);
-    // Kernel
-    if (is.defined(options.kernel)) {
-      if (is.string(kernel[options.kernel])) {
-        this.options.kernel = kernel[options.kernel];
-      } else {
-        throw is.invalidParameterError('kernel', 'valid kernel name', options.kernel);
-      }
-    }
-    // Without enlargement
-    if (is.defined(options.withoutEnlargement)) {
-      this._setBooleanOption('withoutEnlargement', options.withoutEnlargement);
-    }
-    // Shrink on load
-    if (is.defined(options.fastShrinkOnLoad)) {
-      this._setBooleanOption('fastShrinkOnLoad', options.fastShrinkOnLoad);
-    }
-  }
-  return this;
-}
+        this.zipCommentLength = this.reader.readInt(2);
+        // warning : the encoding depends of the system locale
+        // On a linux machine with LANG=en_US.utf8, this field is utf8 encoded.
+        // On a windows machine, this field is encoded with the localized windows code page.
+        var zipComment = this.reader.readData(this.zipCommentLength);
+        var decodeParamType = support.uint8array ? "uint8array" : "array";
+        // To get consistent behavior with the generation part, we will assume that
+        // this is utf8 encoded unless specified otherwise.
+        var decodeContent = utils.transformTo(decodeParamType, zipComment);
+        this.zipComment = this.loadOptions.decodeFileName(decodeContent);
+    },
+    /**
+     * Read the end of the Zip 64 central directory.
+     * Not merged with the method readEndOfCentral :
+     * The end of central can coexist with its Zip64 brother,
+     * I don't want to read the wrong number of bytes !
+     */
+    readBlockZip64EndOfCentral: function() {
+        this.zip64EndOfCentralSize = this.reader.readInt(8);
+        this.reader.skip(4);
+        // this.versionMadeBy = this.reader.readString(2);
+        // this.versionNeeded = this.reader.readInt(2);
+        this.diskNumber = this.reader.readInt(4);
+        this.diskWithCentralDirStart = this.reader.readInt(4);
+        this.centralDirRecordsOnThisDisk = this.reader.readInt(8);
+        this.centralDirRecords = this.reader.readInt(8);
+        this.centralDirSize = this.reader.readInt(8);
+        this.centralDirOffset = this.reader.readInt(8);
 
-/**
- * Extends/pads the edges of the image with the provided background colour.
- * This operation will always occur after resizing and extraction, if any.
- *
- * @example
- * // Resize to 140 pixels wide, then add 10 transparent pixels
- * // to the top, left and right edges and 20 to the bottom edge
- * sharp(input)
- *   .resize(140)
- *   .extend({
- *     top: 10,
- *     bottom: 20,
- *     left: 10,
- *     right: 10,
- *     background: { r: 0, g: 0, b: 0, alpha: 0 }
- *   })
- *   ...
- *
-* @example
- * // Add a row of 10 red pixels to the bottom
- * sharp(input)
- *   .extend({
- *     bottom: 10,
- *     background: 'red'
- *   })
- *   ...
- *
- * @param {(number|Object)} extend - single pixel count to add to all edges or an Object with per-edge counts
- * @param {number} [extend.top=0]
- * @param {number} [extend.left=0]
- * @param {number} [extend.bottom=0]
- * @param {number} [extend.right=0]
- * @param {String|Object} [extend.background={r: 0, g: 0, b: 0, alpha: 1}] - background colour, parsed by the [color](https://www.npmjs.org/package/color) module, defaults to black without transparency.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
-*/
-function extend (extend) {
-  if (is.integer(extend) && extend > 0) {
-    this.options.extendTop = extend;
-    this.options.extendBottom = extend;
-    this.options.extendLeft = extend;
-    this.options.extendRight = extend;
-  } else if (is.object(extend)) {
-    if (is.defined(extend.top)) {
-      if (is.integer(extend.top) && extend.top >= 0) {
-        this.options.extendTop = extend.top;
-      } else {
-        throw is.invalidParameterError('top', 'positive integer', extend.top);
-      }
-    }
-    if (is.defined(extend.bottom)) {
-      if (is.integer(extend.bottom) && extend.bottom >= 0) {
-        this.options.extendBottom = extend.bottom;
-      } else {
-        throw is.invalidParameterError('bottom', 'positive integer', extend.bottom);
-      }
-    }
-    if (is.defined(extend.left)) {
-      if (is.integer(extend.left) && extend.left >= 0) {
-        this.options.extendLeft = extend.left;
-      } else {
-        throw is.invalidParameterError('left', 'positive integer', extend.left);
-      }
-    }
-    if (is.defined(extend.right)) {
-      if (is.integer(extend.right) && extend.right >= 0) {
-        this.options.extendRight = extend.right;
-      } else {
-        throw is.invalidParameterError('right', 'positive integer', extend.right);
-      }
-    }
-    this._setBackgroundColourOption('extendBackground', extend.background);
-  } else {
-    throw is.invalidParameterError('extend', 'integer or object', extend);
-  }
-  return this;
-}
+        this.zip64ExtensibleData = {};
+        var extraDataSize = this.zip64EndOfCentralSize - 44,
+            index = 0,
+            extraFieldId,
+            extraFieldLength,
+            extraFieldValue;
+        while (index < extraDataSize) {
+            extraFieldId = this.reader.readInt(2);
+            extraFieldLength = this.reader.readInt(4);
+            extraFieldValue = this.reader.readData(extraFieldLength);
+            this.zip64ExtensibleData[extraFieldId] = {
+                id: extraFieldId,
+                length: extraFieldLength,
+                value: extraFieldValue
+            };
+        }
+    },
+    /**
+     * Read the end of the Zip 64 central directory locator.
+     */
+    readBlockZip64EndOfCentralLocator: function() {
+        this.diskWithZip64CentralDirStart = this.reader.readInt(4);
+        this.relativeOffsetEndOfZip64CentralDir = this.reader.readInt(8);
+        this.disksCount = this.reader.readInt(4);
+        if (this.disksCount > 1) {
+            throw new Error("Multi-volumes zip are not supported");
+        }
+    },
+    /**
+     * Read the local files, based on the offset read in the central part.
+     */
+    readLocalFiles: function() {
+        var i, file;
+        for (i = 0; i < this.files.length; i++) {
+            file = this.files[i];
+            this.reader.setIndex(file.localHeaderOffset);
+            this.checkSignature(sig.LOCAL_FILE_HEADER);
+            file.readLocalPart(this.reader);
+            file.handleUTF8();
+            file.processAttributes();
+        }
+    },
+    /**
+     * Read the central directory.
+     */
+    readCentralDir: function() {
+        var file;
 
-/**
- * Extract/crop a region of the image.
- *
- * - Use `extract` before `resize` for pre-resize extraction.
- * - Use `extract` after `resize` for post-resize extraction.
- * - Use `extract` before and after for both.
- *
- * @example
- * sharp(input)
- *   .extract({ left: left, top: top, width: width, height: height })
- *   .toFile(output, function(err) {
- *     // Extract a region of the input image, saving in the same format.
- *   });
- * @example
- * sharp(input)
- *   .extract({ left: leftOffsetPre, top: topOffsetPre, width: widthPre, height: heightPre })
- *   .resize(width, height)
- *   .extract({ left: leftOffsetPost, top: topOffsetPost, width: widthPost, height: heightPost })
- *   .toFile(output, function(err) {
- *     // Extract a region, resize, then extract from the resized image
- *   });
- *
- * @param {Object} options - describes the region to extract using integral pixel values
- * @param {number} options.left - zero-indexed offset from left edge
- * @param {number} options.top - zero-indexed offset from top edge
- * @param {number} options.width - width of region to extract
- * @param {number} options.height - height of region to extract
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function extract (options) {
-  const suffix = this.options.width === -1 && this.options.height === -1 ? 'Pre' : 'Post';
-  ['left', 'top', 'width', 'height'].forEach(function (name) {
-    const value = options[name];
-    if (is.integer(value) && value >= 0) {
-      this.options[name + (name === 'left' || name === 'top' ? 'Offset' : '') + suffix] = value;
-    } else {
-      throw is.invalidParameterError(name, 'integer', value);
+        this.reader.setIndex(this.centralDirOffset);
+        while (this.reader.readAndCheckSignature(sig.CENTRAL_FILE_HEADER)) {
+            file = new ZipEntry({
+                zip64: this.zip64
+            }, this.loadOptions);
+            file.readCentralPart(this.reader);
+            this.files.push(file);
+        }
+
+        if (this.centralDirRecords !== this.files.length) {
+            if (this.centralDirRecords !== 0 && this.files.length === 0) {
+                // We expected some records but couldn't find ANY.
+                // This is really suspicious, as if something went wrong.
+                throw new Error("Corrupted zip or bug: expected " + this.centralDirRecords + " records in central dir, got " + this.files.length);
+            } else {
+                // We found some records but not all.
+                // Something is wrong but we got something for the user: no error here.
+                // console.warn("expected", this.centralDirRecords, "records in central dir, got", this.files.length);
+            }
+        }
+    },
+    /**
+     * Read the end of central directory.
+     */
+    readEndOfCentral: function() {
+        var offset = this.reader.lastIndexOfSignature(sig.CENTRAL_DIRECTORY_END);
+        if (offset < 0) {
+            // Check if the content is a truncated zip or complete garbage.
+            // A "LOCAL_FILE_HEADER" is not required at the beginning (auto
+            // extractible zip for example) but it can give a good hint.
+            // If an ajax request was used without responseType, we will also
+            // get unreadable data.
+            var isGarbage = !this.isSignature(0, sig.LOCAL_FILE_HEADER);
+
+            if (isGarbage) {
+                throw new Error("Can't find end of central directory : is this a zip file ? " +
+                                "If it is, see https://stuk.github.io/jszip/documentation/howto/read_zip.html");
+            } else {
+                throw new Error("Corrupted zip: can't find end of central directory");
+            }
+
+        }
+        this.reader.setIndex(offset);
+        var endOfCentralDirOffset = offset;
+        this.checkSignature(sig.CENTRAL_DIRECTORY_END);
+        this.readBlockEndOfCentral();
+
+
+        /* extract from the zip spec :
+            4)  If one of the fields in the end of central directory
+                record is too small to hold required data, the field
+                should be set to -1 (0xFFFF or 0xFFFFFFFF) and the
+                ZIP64 format record should be created.
+            5)  The end of central directory record and the
+                Zip64 end of central directory locator record must
+                reside on the same disk when splitting or spanning
+                an archive.
+         */
+        if (this.diskNumber === utils.MAX_VALUE_16BITS || this.diskWithCentralDirStart === utils.MAX_VALUE_16BITS || this.centralDirRecordsOnThisDisk === utils.MAX_VALUE_16BITS || this.centralDirRecords === utils.MAX_VALUE_16BITS || this.centralDirSize === utils.MAX_VALUE_32BITS || this.centralDirOffset === utils.MAX_VALUE_32BITS) {
+            this.zip64 = true;
+
+            /*
+            Warning : the zip64 extension is supported, but ONLY if the 64bits integer read from
+            the zip file can fit into a 32bits integer. This cannot be solved : JavaScript represents
+            all numbers as 64-bit double precision IEEE 754 floating point numbers.
+            So, we have 53bits for integers and bitwise operations treat everything as 32bits.
+            see https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Operators/Bitwise_Operators
+            and http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-262.pdf section 8.5
+            */
+
+            // should look for a zip64 EOCD locator
+            offset = this.reader.lastIndexOfSignature(sig.ZIP64_CENTRAL_DIRECTORY_LOCATOR);
+            if (offset < 0) {
+                throw new Error("Corrupted zip: can't find the ZIP64 end of central directory locator");
+            }
+            this.reader.setIndex(offset);
+            this.checkSignature(sig.ZIP64_CENTRAL_DIRECTORY_LOCATOR);
+            this.readBlockZip64EndOfCentralLocator();
+
+            // now the zip64 EOCD record
+            if (!this.isSignature(this.relativeOffsetEndOfZip64CentralDir, sig.ZIP64_CENTRAL_DIRECTORY_END)) {
+                // console.warn("ZIP64 end of central directory not where expected.");
+                this.relativeOffsetEndOfZip64CentralDir = this.reader.lastIndexOfSignature(sig.ZIP64_CENTRAL_DIRECTORY_END);
+                if (this.relativeOffsetEndOfZip64CentralDir < 0) {
+                    throw new Error("Corrupted zip: can't find the ZIP64 end of central directory");
+                }
+            }
+            this.reader.setIndex(this.relativeOffsetEndOfZip64CentralDir);
+            this.checkSignature(sig.ZIP64_CENTRAL_DIRECTORY_END);
+            this.readBlockZip64EndOfCentral();
+        }
+
+        var expectedEndOfCentralDirOffset = this.centralDirOffset + this.centralDirSize;
+        if (this.zip64) {
+            expectedEndOfCentralDirOffset += 20; // end of central dir 64 locator
+            expectedEndOfCentralDirOffset += 12 /* should not include the leading 12 bytes */ + this.zip64EndOfCentralSize;
+        }
+
+        var extraBytes = endOfCentralDirOffset - expectedEndOfCentralDirOffset;
+
+        if (extraBytes > 0) {
+            // console.warn(extraBytes, "extra bytes at beginning or within zipfile");
+            if (this.isSignature(endOfCentralDirOffset, sig.CENTRAL_FILE_HEADER)) {
+                // The offsets seem wrong, but we have something at the specified offset.
+                // So… we keep it.
+            } else {
+                // the offset is wrong, update the "zero" of the reader
+                // this happens if data has been prepended (crx files for example)
+                this.reader.zero = extraBytes;
+            }
+        } else if (extraBytes < 0) {
+            throw new Error("Corrupted zip: missing " + Math.abs(extraBytes) + " bytes.");
+        }
+    },
+    prepareReader: function(data) {
+        this.reader = readerFor(data);
+    },
+    /**
+     * Read a zip file and create ZipEntries.
+     * @param {String|ArrayBuffer|Uint8Array|Buffer} data the binary string representing a zip file.
+     */
+    load: function(data) {
+        this.prepareReader(data);
+        this.readEndOfCentral();
+        this.readCentralDir();
+        this.readLocalFiles();
     }
-  }, this);
-  // Ensure existing rotation occurs before pre-resize extraction
-  if (suffix === 'Pre' && isRotationExpected(this.options)) {
-    this.options.rotateBeforePreExtract = true;
-  }
-  return this;
-}
-
-/**
- * Trim "boring" pixels from all edges that contain values similar to the top-left pixel.
- * Images consisting entirely of a single colour will calculate "boring" using the alpha channel, if any.
- *
- * The `info` response Object, obtained from callback of `.toFile()` or `.toBuffer()`,
- * will contain `trimOffsetLeft` and `trimOffsetTop` properties.
- *
- * @param {number} [threshold=10] the allowed difference from the top-left pixel, a number greater than zero.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function trim (threshold) {
-  if (!is.defined(threshold)) {
-    this.options.trimThreshold = 10;
-  } else if (is.number(threshold) && threshold > 0) {
-    this.options.trimThreshold = threshold;
-  } else {
-    throw is.invalidParameterError('threshold', 'number greater than zero', threshold);
-  }
-  if (this.options.trimThreshold && isRotationExpected(this.options)) {
-    this.options.rotateBeforePreExtract = true;
-  }
-  return this;
-}
-
-/**
- * Decorate the Sharp prototype with resize-related functions.
- * @private
- */
-module.exports = function (Sharp) {
-  Object.assign(Sharp.prototype, {
-    resize,
-    extend,
-    extract,
-    trim
-  });
-  // Class attributes
-  Sharp.gravity = gravity;
-  Sharp.strategy = strategy;
-  Sharp.kernel = kernel;
-  Sharp.fit = fit;
-  Sharp.position = position;
 };
+// }}} end of ZipEntries
+module.exports = ZipEntries;
 
 
 /***/ }),
-/* 438 */,
-/* 439 */,
-/* 440 */
+
+/***/ 440:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -21165,14 +17371,8 @@ module.exports.makeDirSync = (input, options) => {
 
 
 /***/ }),
-/* 441 */,
-/* 442 */,
-/* 443 */,
-/* 444 */,
-/* 445 */,
-/* 446 */,
-/* 447 */,
-/* 448 */
+
+/***/ 448:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -21184,12 +17384,8 @@ module.exports = {
 
 
 /***/ }),
-/* 449 */,
-/* 450 */,
-/* 451 */,
-/* 452 */,
-/* 453 */,
-/* 454 */
+
+/***/ 454:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -21270,8 +17466,8 @@ module.exports = CompressedObject;
 
 
 /***/ }),
-/* 455 */,
-/* 456 */
+
+/***/ 456:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var debug;
@@ -21291,28 +17487,8 @@ module.exports = function () {
 
 
 /***/ }),
-/* 457 */,
-/* 458 */,
-/* 459 */,
-/* 460 */,
-/* 461 */,
-/* 462 */,
-/* 463 */
-/***/ (function(module) {
 
-"use strict";
-
-module.exports = function (Yallist) {
-  Yallist.prototype[Symbol.iterator] = function* () {
-    for (let walker = this.head; walker; walker = walker.next) {
-      yield walker.value
-    }
-  }
-}
-
-
-/***/ }),
-/* 464 */
+/***/ 464:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -21376,16 +17552,17 @@ module.exports = CancelToken;
 
 
 /***/ }),
-/* 465 */
+
+/***/ 465:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
 
 var utils = __webpack_require__(318);
-var transformData = __webpack_require__(998);
+var transformData = __webpack_require__(849);
 var isCancel = __webpack_require__(752);
-var defaults = __webpack_require__(164);
+var defaults = __webpack_require__(82);
 
 /**
  * Throws a `Cancel` if cancellation has been requested.
@@ -21462,9 +17639,8 @@ module.exports = function dispatchRequest(config) {
 
 
 /***/ }),
-/* 466 */,
-/* 467 */,
-/* 468 */
+
+/***/ 468:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -21495,25 +17671,8 @@ module.exports = Crc32Probe;
 
 
 /***/ }),
-/* 469 */,
-/* 470 */,
-/* 471 */,
-/* 472 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const parse = __webpack_require__(621)
-const valid = (version, options) => {
-  const v = parse(version, options)
-  return v ? v.version : null
-}
-module.exports = valid
-
-
-/***/ }),
-/* 473 */,
-/* 474 */,
-/* 475 */,
-/* 476 */
+/***/ 476:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 try {
@@ -21528,9 +17687,8 @@ try {
 
 
 /***/ }),
-/* 477 */,
-/* 478 */,
-/* 479 */
+
+/***/ 479:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -21600,1262 +17758,15 @@ module.exports = {
 
 
 /***/ }),
-/* 480 */,
-/* 481 */
+
+/***/ 481:
 /***/ (function(module) {
 
 module.exports = {"name":"axios","version":"0.21.1","description":"Promise based HTTP client for the browser and node.js","main":"index.js","scripts":{"test":"grunt test && bundlesize","start":"node ./sandbox/server.js","build":"NODE_ENV=production grunt build","preversion":"npm test","version":"npm run build && grunt version && git add -A dist && git add CHANGELOG.md bower.json package.json","postversion":"git push && git push --tags","examples":"node ./examples/server.js","coveralls":"cat coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js","fix":"eslint --fix lib/**/*.js"},"repository":{"type":"git","url":"https://github.com/axios/axios.git"},"keywords":["xhr","http","ajax","promise","node"],"author":"Matt Zabriskie","license":"MIT","bugs":{"url":"https://github.com/axios/axios/issues"},"homepage":"https://github.com/axios/axios","devDependencies":{"bundlesize":"^0.17.0","coveralls":"^3.0.0","es6-promise":"^4.2.4","grunt":"^1.0.2","grunt-banner":"^0.6.0","grunt-cli":"^1.2.0","grunt-contrib-clean":"^1.1.0","grunt-contrib-watch":"^1.0.0","grunt-eslint":"^20.1.0","grunt-karma":"^2.0.0","grunt-mocha-test":"^0.13.3","grunt-ts":"^6.0.0-beta.19","grunt-webpack":"^1.0.18","istanbul-instrumenter-loader":"^1.0.0","jasmine-core":"^2.4.1","karma":"^1.3.0","karma-chrome-launcher":"^2.2.0","karma-coverage":"^1.1.1","karma-firefox-launcher":"^1.1.0","karma-jasmine":"^1.1.1","karma-jasmine-ajax":"^0.1.13","karma-opera-launcher":"^1.0.0","karma-safari-launcher":"^1.0.0","karma-sauce-launcher":"^1.2.0","karma-sinon":"^1.0.5","karma-sourcemap-loader":"^0.3.7","karma-webpack":"^1.7.0","load-grunt-tasks":"^3.5.2","minimist":"^1.2.0","mocha":"^5.2.0","sinon":"^4.5.0","typescript":"^2.8.1","url-search-params":"^0.10.0","webpack":"^1.13.1","webpack-dev-server":"^1.14.1"},"browser":{"./lib/adapters/http.js":"./lib/adapters/xhr.js"},"jsdelivr":"dist/axios.min.js","unpkg":"dist/axios.min.js","typings":"./index.d.ts","dependencies":{"follow-redirects":"^1.10.0"},"bundlesize":[{"path":"./dist/axios.min.js","threshold":"5kB"}]};
 
 /***/ }),
-/* 482 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const Range = __webpack_require__(174)
-const intersects = (r1, r2, options) => {
-  r1 = new Range(r1, options)
-  r2 = new Range(r2, options)
-  return r1.intersects(r2)
-}
-module.exports = intersects
-
-
-/***/ }),
-/* 483 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-
-// (C) 1995-2013 Jean-loup Gailly and Mark Adler
-// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
-//
-// This software is provided 'as-is', without any express or implied
-// warranty. In no event will the authors be held liable for any damages
-// arising from the use of this software.
-//
-// Permission is granted to anyone to use this software for any purpose,
-// including commercial applications, and to alter it and redistribute it
-// freely, subject to the following restrictions:
-//
-// 1. The origin of this software must not be misrepresented; you must not
-//   claim that you wrote the original software. If you use this software
-//   in a product, an acknowledgment in the product documentation would be
-//   appreciated but is not required.
-// 2. Altered source versions must be plainly marked as such, and must not be
-//   misrepresented as being the original software.
-// 3. This notice may not be removed or altered from any source distribution.
-
-/* eslint-disable space-unary-ops */
-
-var utils = __webpack_require__(33);
-
-/* Public constants ==========================================================*/
-/* ===========================================================================*/
-
-
-//var Z_FILTERED          = 1;
-//var Z_HUFFMAN_ONLY      = 2;
-//var Z_RLE               = 3;
-var Z_FIXED               = 4;
-//var Z_DEFAULT_STRATEGY  = 0;
-
-/* Possible values of the data_type field (though see inflate()) */
-var Z_BINARY              = 0;
-var Z_TEXT                = 1;
-//var Z_ASCII             = 1; // = Z_TEXT
-var Z_UNKNOWN             = 2;
-
-/*============================================================================*/
-
-
-function zero(buf) { var len = buf.length; while (--len >= 0) { buf[len] = 0; } }
-
-// From zutil.h
-
-var STORED_BLOCK = 0;
-var STATIC_TREES = 1;
-var DYN_TREES    = 2;
-/* The three kinds of block type */
-
-var MIN_MATCH    = 3;
-var MAX_MATCH    = 258;
-/* The minimum and maximum match lengths */
-
-// From deflate.h
-/* ===========================================================================
- * Internal compression state.
- */
-
-var LENGTH_CODES  = 29;
-/* number of length codes, not counting the special END_BLOCK code */
-
-var LITERALS      = 256;
-/* number of literal bytes 0..255 */
-
-var L_CODES       = LITERALS + 1 + LENGTH_CODES;
-/* number of Literal or Length codes, including the END_BLOCK code */
-
-var D_CODES       = 30;
-/* number of distance codes */
-
-var BL_CODES      = 19;
-/* number of codes used to transfer the bit lengths */
-
-var HEAP_SIZE     = 2 * L_CODES + 1;
-/* maximum heap size */
-
-var MAX_BITS      = 15;
-/* All codes must not exceed MAX_BITS bits */
-
-var Buf_size      = 16;
-/* size of bit buffer in bi_buf */
-
-
-/* ===========================================================================
- * Constants
- */
-
-var MAX_BL_BITS = 7;
-/* Bit length codes must not exceed MAX_BL_BITS bits */
-
-var END_BLOCK   = 256;
-/* end of block literal code */
-
-var REP_3_6     = 16;
-/* repeat previous bit length 3-6 times (2 bits of repeat count) */
-
-var REPZ_3_10   = 17;
-/* repeat a zero length 3-10 times  (3 bits of repeat count) */
-
-var REPZ_11_138 = 18;
-/* repeat a zero length 11-138 times  (7 bits of repeat count) */
-
-/* eslint-disable comma-spacing,array-bracket-spacing */
-var extra_lbits =   /* extra bits for each length code */
-  [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
-
-var extra_dbits =   /* extra bits for each distance code */
-  [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
-
-var extra_blbits =  /* extra bits for each bit length code */
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7];
-
-var bl_order =
-  [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
-/* eslint-enable comma-spacing,array-bracket-spacing */
-
-/* The lengths of the bit length codes are sent in order of decreasing
- * probability, to avoid transmitting the lengths for unused bit length codes.
- */
-
-/* ===========================================================================
- * Local data. These are initialized only once.
- */
-
-// We pre-fill arrays with 0 to avoid uninitialized gaps
-
-var DIST_CODE_LEN = 512; /* see definition of array dist_code below */
-
-// !!!! Use flat array instead of structure, Freq = i*2, Len = i*2+1
-var static_ltree  = new Array((L_CODES + 2) * 2);
-zero(static_ltree);
-/* The static literal tree. Since the bit lengths are imposed, there is no
- * need for the L_CODES extra codes used during heap construction. However
- * The codes 286 and 287 are needed to build a canonical tree (see _tr_init
- * below).
- */
-
-var static_dtree  = new Array(D_CODES * 2);
-zero(static_dtree);
-/* The static distance tree. (Actually a trivial tree since all codes use
- * 5 bits.)
- */
-
-var _dist_code    = new Array(DIST_CODE_LEN);
-zero(_dist_code);
-/* Distance codes. The first 256 values correspond to the distances
- * 3 .. 258, the last 256 values correspond to the top 8 bits of
- * the 15 bit distances.
- */
-
-var _length_code  = new Array(MAX_MATCH - MIN_MATCH + 1);
-zero(_length_code);
-/* length code for each normalized match length (0 == MIN_MATCH) */
-
-var base_length   = new Array(LENGTH_CODES);
-zero(base_length);
-/* First normalized length for each code (0 = MIN_MATCH) */
-
-var base_dist     = new Array(D_CODES);
-zero(base_dist);
-/* First normalized distance for each code (0 = distance of 1) */
-
-
-function StaticTreeDesc(static_tree, extra_bits, extra_base, elems, max_length) {
-
-  this.static_tree  = static_tree;  /* static tree or NULL */
-  this.extra_bits   = extra_bits;   /* extra bits for each code or NULL */
-  this.extra_base   = extra_base;   /* base index for extra_bits */
-  this.elems        = elems;        /* max number of elements in the tree */
-  this.max_length   = max_length;   /* max bit length for the codes */
-
-  // show if `static_tree` has data or dummy - needed for monomorphic objects
-  this.has_stree    = static_tree && static_tree.length;
-}
-
-
-var static_l_desc;
-var static_d_desc;
-var static_bl_desc;
-
-
-function TreeDesc(dyn_tree, stat_desc) {
-  this.dyn_tree = dyn_tree;     /* the dynamic tree */
-  this.max_code = 0;            /* largest code with non zero frequency */
-  this.stat_desc = stat_desc;   /* the corresponding static tree */
-}
-
-
-
-function d_code(dist) {
-  return dist < 256 ? _dist_code[dist] : _dist_code[256 + (dist >>> 7)];
-}
-
-
-/* ===========================================================================
- * Output a short LSB first on the stream.
- * IN assertion: there is enough room in pendingBuf.
- */
-function put_short(s, w) {
-//    put_byte(s, (uch)((w) & 0xff));
-//    put_byte(s, (uch)((ush)(w) >> 8));
-  s.pending_buf[s.pending++] = (w) & 0xff;
-  s.pending_buf[s.pending++] = (w >>> 8) & 0xff;
-}
-
-
-/* ===========================================================================
- * Send a value on a given number of bits.
- * IN assertion: length <= 16 and value fits in length bits.
- */
-function send_bits(s, value, length) {
-  if (s.bi_valid > (Buf_size - length)) {
-    s.bi_buf |= (value << s.bi_valid) & 0xffff;
-    put_short(s, s.bi_buf);
-    s.bi_buf = value >> (Buf_size - s.bi_valid);
-    s.bi_valid += length - Buf_size;
-  } else {
-    s.bi_buf |= (value << s.bi_valid) & 0xffff;
-    s.bi_valid += length;
-  }
-}
-
-
-function send_code(s, c, tree) {
-  send_bits(s, tree[c * 2]/*.Code*/, tree[c * 2 + 1]/*.Len*/);
-}
-
-
-/* ===========================================================================
- * Reverse the first len bits of a code, using straightforward code (a faster
- * method would use a table)
- * IN assertion: 1 <= len <= 15
- */
-function bi_reverse(code, len) {
-  var res = 0;
-  do {
-    res |= code & 1;
-    code >>>= 1;
-    res <<= 1;
-  } while (--len > 0);
-  return res >>> 1;
-}
-
-
-/* ===========================================================================
- * Flush the bit buffer, keeping at most 7 bits in it.
- */
-function bi_flush(s) {
-  if (s.bi_valid === 16) {
-    put_short(s, s.bi_buf);
-    s.bi_buf = 0;
-    s.bi_valid = 0;
-
-  } else if (s.bi_valid >= 8) {
-    s.pending_buf[s.pending++] = s.bi_buf & 0xff;
-    s.bi_buf >>= 8;
-    s.bi_valid -= 8;
-  }
-}
-
-
-/* ===========================================================================
- * Compute the optimal bit lengths for a tree and update the total bit length
- * for the current block.
- * IN assertion: the fields freq and dad are set, heap[heap_max] and
- *    above are the tree nodes sorted by increasing frequency.
- * OUT assertions: the field len is set to the optimal bit length, the
- *     array bl_count contains the frequencies for each bit length.
- *     The length opt_len is updated; static_len is also updated if stree is
- *     not null.
- */
-function gen_bitlen(s, desc)
-//    deflate_state *s;
-//    tree_desc *desc;    /* the tree descriptor */
-{
-  var tree            = desc.dyn_tree;
-  var max_code        = desc.max_code;
-  var stree           = desc.stat_desc.static_tree;
-  var has_stree       = desc.stat_desc.has_stree;
-  var extra           = desc.stat_desc.extra_bits;
-  var base            = desc.stat_desc.extra_base;
-  var max_length      = desc.stat_desc.max_length;
-  var h;              /* heap index */
-  var n, m;           /* iterate over the tree elements */
-  var bits;           /* bit length */
-  var xbits;          /* extra bits */
-  var f;              /* frequency */
-  var overflow = 0;   /* number of elements with bit length too large */
-
-  for (bits = 0; bits <= MAX_BITS; bits++) {
-    s.bl_count[bits] = 0;
-  }
-
-  /* In a first pass, compute the optimal bit lengths (which may
-   * overflow in the case of the bit length tree).
-   */
-  tree[s.heap[s.heap_max] * 2 + 1]/*.Len*/ = 0; /* root of the heap */
-
-  for (h = s.heap_max + 1; h < HEAP_SIZE; h++) {
-    n = s.heap[h];
-    bits = tree[tree[n * 2 + 1]/*.Dad*/ * 2 + 1]/*.Len*/ + 1;
-    if (bits > max_length) {
-      bits = max_length;
-      overflow++;
-    }
-    tree[n * 2 + 1]/*.Len*/ = bits;
-    /* We overwrite tree[n].Dad which is no longer needed */
-
-    if (n > max_code) { continue; } /* not a leaf node */
-
-    s.bl_count[bits]++;
-    xbits = 0;
-    if (n >= base) {
-      xbits = extra[n - base];
-    }
-    f = tree[n * 2]/*.Freq*/;
-    s.opt_len += f * (bits + xbits);
-    if (has_stree) {
-      s.static_len += f * (stree[n * 2 + 1]/*.Len*/ + xbits);
-    }
-  }
-  if (overflow === 0) { return; }
-
-  // Trace((stderr,"\nbit length overflow\n"));
-  /* This happens for example on obj2 and pic of the Calgary corpus */
-
-  /* Find the first bit length which could increase: */
-  do {
-    bits = max_length - 1;
-    while (s.bl_count[bits] === 0) { bits--; }
-    s.bl_count[bits]--;      /* move one leaf down the tree */
-    s.bl_count[bits + 1] += 2; /* move one overflow item as its brother */
-    s.bl_count[max_length]--;
-    /* The brother of the overflow item also moves one step up,
-     * but this does not affect bl_count[max_length]
-     */
-    overflow -= 2;
-  } while (overflow > 0);
-
-  /* Now recompute all bit lengths, scanning in increasing frequency.
-   * h is still equal to HEAP_SIZE. (It is simpler to reconstruct all
-   * lengths instead of fixing only the wrong ones. This idea is taken
-   * from 'ar' written by Haruhiko Okumura.)
-   */
-  for (bits = max_length; bits !== 0; bits--) {
-    n = s.bl_count[bits];
-    while (n !== 0) {
-      m = s.heap[--h];
-      if (m > max_code) { continue; }
-      if (tree[m * 2 + 1]/*.Len*/ !== bits) {
-        // Trace((stderr,"code %d bits %d->%d\n", m, tree[m].Len, bits));
-        s.opt_len += (bits - tree[m * 2 + 1]/*.Len*/) * tree[m * 2]/*.Freq*/;
-        tree[m * 2 + 1]/*.Len*/ = bits;
-      }
-      n--;
-    }
-  }
-}
-
-
-/* ===========================================================================
- * Generate the codes for a given tree and bit counts (which need not be
- * optimal).
- * IN assertion: the array bl_count contains the bit length statistics for
- * the given tree and the field len is set for all tree elements.
- * OUT assertion: the field code is set for all tree elements of non
- *     zero code length.
- */
-function gen_codes(tree, max_code, bl_count)
-//    ct_data *tree;             /* the tree to decorate */
-//    int max_code;              /* largest code with non zero frequency */
-//    ushf *bl_count;            /* number of codes at each bit length */
-{
-  var next_code = new Array(MAX_BITS + 1); /* next code value for each bit length */
-  var code = 0;              /* running code value */
-  var bits;                  /* bit index */
-  var n;                     /* code index */
-
-  /* The distribution counts are first used to generate the code values
-   * without bit reversal.
-   */
-  for (bits = 1; bits <= MAX_BITS; bits++) {
-    next_code[bits] = code = (code + bl_count[bits - 1]) << 1;
-  }
-  /* Check that the bit counts in bl_count are consistent. The last code
-   * must be all ones.
-   */
-  //Assert (code + bl_count[MAX_BITS]-1 == (1<<MAX_BITS)-1,
-  //        "inconsistent bit counts");
-  //Tracev((stderr,"\ngen_codes: max_code %d ", max_code));
-
-  for (n = 0;  n <= max_code; n++) {
-    var len = tree[n * 2 + 1]/*.Len*/;
-    if (len === 0) { continue; }
-    /* Now reverse the bits */
-    tree[n * 2]/*.Code*/ = bi_reverse(next_code[len]++, len);
-
-    //Tracecv(tree != static_ltree, (stderr,"\nn %3d %c l %2d c %4x (%x) ",
-    //     n, (isgraph(n) ? n : ' '), len, tree[n].Code, next_code[len]-1));
-  }
-}
-
-
-/* ===========================================================================
- * Initialize the various 'constant' tables.
- */
-function tr_static_init() {
-  var n;        /* iterates over tree elements */
-  var bits;     /* bit counter */
-  var length;   /* length value */
-  var code;     /* code value */
-  var dist;     /* distance index */
-  var bl_count = new Array(MAX_BITS + 1);
-  /* number of codes at each bit length for an optimal tree */
-
-  // do check in _tr_init()
-  //if (static_init_done) return;
-
-  /* For some embedded targets, global variables are not initialized: */
-/*#ifdef NO_INIT_GLOBAL_POINTERS
-  static_l_desc.static_tree = static_ltree;
-  static_l_desc.extra_bits = extra_lbits;
-  static_d_desc.static_tree = static_dtree;
-  static_d_desc.extra_bits = extra_dbits;
-  static_bl_desc.extra_bits = extra_blbits;
-#endif*/
-
-  /* Initialize the mapping length (0..255) -> length code (0..28) */
-  length = 0;
-  for (code = 0; code < LENGTH_CODES - 1; code++) {
-    base_length[code] = length;
-    for (n = 0; n < (1 << extra_lbits[code]); n++) {
-      _length_code[length++] = code;
-    }
-  }
-  //Assert (length == 256, "tr_static_init: length != 256");
-  /* Note that the length 255 (match length 258) can be represented
-   * in two different ways: code 284 + 5 bits or code 285, so we
-   * overwrite length_code[255] to use the best encoding:
-   */
-  _length_code[length - 1] = code;
-
-  /* Initialize the mapping dist (0..32K) -> dist code (0..29) */
-  dist = 0;
-  for (code = 0; code < 16; code++) {
-    base_dist[code] = dist;
-    for (n = 0; n < (1 << extra_dbits[code]); n++) {
-      _dist_code[dist++] = code;
-    }
-  }
-  //Assert (dist == 256, "tr_static_init: dist != 256");
-  dist >>= 7; /* from now on, all distances are divided by 128 */
-  for (; code < D_CODES; code++) {
-    base_dist[code] = dist << 7;
-    for (n = 0; n < (1 << (extra_dbits[code] - 7)); n++) {
-      _dist_code[256 + dist++] = code;
-    }
-  }
-  //Assert (dist == 256, "tr_static_init: 256+dist != 512");
-
-  /* Construct the codes of the static literal tree */
-  for (bits = 0; bits <= MAX_BITS; bits++) {
-    bl_count[bits] = 0;
-  }
-
-  n = 0;
-  while (n <= 143) {
-    static_ltree[n * 2 + 1]/*.Len*/ = 8;
-    n++;
-    bl_count[8]++;
-  }
-  while (n <= 255) {
-    static_ltree[n * 2 + 1]/*.Len*/ = 9;
-    n++;
-    bl_count[9]++;
-  }
-  while (n <= 279) {
-    static_ltree[n * 2 + 1]/*.Len*/ = 7;
-    n++;
-    bl_count[7]++;
-  }
-  while (n <= 287) {
-    static_ltree[n * 2 + 1]/*.Len*/ = 8;
-    n++;
-    bl_count[8]++;
-  }
-  /* Codes 286 and 287 do not exist, but we must include them in the
-   * tree construction to get a canonical Huffman tree (longest code
-   * all ones)
-   */
-  gen_codes(static_ltree, L_CODES + 1, bl_count);
-
-  /* The static distance tree is trivial: */
-  for (n = 0; n < D_CODES; n++) {
-    static_dtree[n * 2 + 1]/*.Len*/ = 5;
-    static_dtree[n * 2]/*.Code*/ = bi_reverse(n, 5);
-  }
-
-  // Now data ready and we can init static trees
-  static_l_desc = new StaticTreeDesc(static_ltree, extra_lbits, LITERALS + 1, L_CODES, MAX_BITS);
-  static_d_desc = new StaticTreeDesc(static_dtree, extra_dbits, 0,          D_CODES, MAX_BITS);
-  static_bl_desc = new StaticTreeDesc(new Array(0), extra_blbits, 0,         BL_CODES, MAX_BL_BITS);
-
-  //static_init_done = true;
-}
-
-
-/* ===========================================================================
- * Initialize a new block.
- */
-function init_block(s) {
-  var n; /* iterates over tree elements */
-
-  /* Initialize the trees. */
-  for (n = 0; n < L_CODES;  n++) { s.dyn_ltree[n * 2]/*.Freq*/ = 0; }
-  for (n = 0; n < D_CODES;  n++) { s.dyn_dtree[n * 2]/*.Freq*/ = 0; }
-  for (n = 0; n < BL_CODES; n++) { s.bl_tree[n * 2]/*.Freq*/ = 0; }
-
-  s.dyn_ltree[END_BLOCK * 2]/*.Freq*/ = 1;
-  s.opt_len = s.static_len = 0;
-  s.last_lit = s.matches = 0;
-}
-
-
-/* ===========================================================================
- * Flush the bit buffer and align the output on a byte boundary
- */
-function bi_windup(s)
-{
-  if (s.bi_valid > 8) {
-    put_short(s, s.bi_buf);
-  } else if (s.bi_valid > 0) {
-    //put_byte(s, (Byte)s->bi_buf);
-    s.pending_buf[s.pending++] = s.bi_buf;
-  }
-  s.bi_buf = 0;
-  s.bi_valid = 0;
-}
-
-/* ===========================================================================
- * Copy a stored block, storing first the length and its
- * one's complement if requested.
- */
-function copy_block(s, buf, len, header)
-//DeflateState *s;
-//charf    *buf;    /* the input data */
-//unsigned len;     /* its length */
-//int      header;  /* true if block header must be written */
-{
-  bi_windup(s);        /* align on byte boundary */
-
-  if (header) {
-    put_short(s, len);
-    put_short(s, ~len);
-  }
-//  while (len--) {
-//    put_byte(s, *buf++);
-//  }
-  utils.arraySet(s.pending_buf, s.window, buf, len, s.pending);
-  s.pending += len;
-}
-
-/* ===========================================================================
- * Compares to subtrees, using the tree depth as tie breaker when
- * the subtrees have equal frequency. This minimizes the worst case length.
- */
-function smaller(tree, n, m, depth) {
-  var _n2 = n * 2;
-  var _m2 = m * 2;
-  return (tree[_n2]/*.Freq*/ < tree[_m2]/*.Freq*/ ||
-         (tree[_n2]/*.Freq*/ === tree[_m2]/*.Freq*/ && depth[n] <= depth[m]));
-}
-
-/* ===========================================================================
- * Restore the heap property by moving down the tree starting at node k,
- * exchanging a node with the smallest of its two sons if necessary, stopping
- * when the heap property is re-established (each father smaller than its
- * two sons).
- */
-function pqdownheap(s, tree, k)
-//    deflate_state *s;
-//    ct_data *tree;  /* the tree to restore */
-//    int k;               /* node to move down */
-{
-  var v = s.heap[k];
-  var j = k << 1;  /* left son of k */
-  while (j <= s.heap_len) {
-    /* Set j to the smallest of the two sons: */
-    if (j < s.heap_len &&
-      smaller(tree, s.heap[j + 1], s.heap[j], s.depth)) {
-      j++;
-    }
-    /* Exit if v is smaller than both sons */
-    if (smaller(tree, v, s.heap[j], s.depth)) { break; }
-
-    /* Exchange v with the smallest son */
-    s.heap[k] = s.heap[j];
-    k = j;
-
-    /* And continue down the tree, setting j to the left son of k */
-    j <<= 1;
-  }
-  s.heap[k] = v;
-}
-
-
-// inlined manually
-// var SMALLEST = 1;
-
-/* ===========================================================================
- * Send the block data compressed using the given Huffman trees
- */
-function compress_block(s, ltree, dtree)
-//    deflate_state *s;
-//    const ct_data *ltree; /* literal tree */
-//    const ct_data *dtree; /* distance tree */
-{
-  var dist;           /* distance of matched string */
-  var lc;             /* match length or unmatched char (if dist == 0) */
-  var lx = 0;         /* running index in l_buf */
-  var code;           /* the code to send */
-  var extra;          /* number of extra bits to send */
-
-  if (s.last_lit !== 0) {
-    do {
-      dist = (s.pending_buf[s.d_buf + lx * 2] << 8) | (s.pending_buf[s.d_buf + lx * 2 + 1]);
-      lc = s.pending_buf[s.l_buf + lx];
-      lx++;
-
-      if (dist === 0) {
-        send_code(s, lc, ltree); /* send a literal byte */
-        //Tracecv(isgraph(lc), (stderr," '%c' ", lc));
-      } else {
-        /* Here, lc is the match length - MIN_MATCH */
-        code = _length_code[lc];
-        send_code(s, code + LITERALS + 1, ltree); /* send the length code */
-        extra = extra_lbits[code];
-        if (extra !== 0) {
-          lc -= base_length[code];
-          send_bits(s, lc, extra);       /* send the extra length bits */
-        }
-        dist--; /* dist is now the match distance - 1 */
-        code = d_code(dist);
-        //Assert (code < D_CODES, "bad d_code");
-
-        send_code(s, code, dtree);       /* send the distance code */
-        extra = extra_dbits[code];
-        if (extra !== 0) {
-          dist -= base_dist[code];
-          send_bits(s, dist, extra);   /* send the extra distance bits */
-        }
-      } /* literal or match pair ? */
-
-      /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
-      //Assert((uInt)(s->pending) < s->lit_bufsize + 2*lx,
-      //       "pendingBuf overflow");
-
-    } while (lx < s.last_lit);
-  }
-
-  send_code(s, END_BLOCK, ltree);
-}
-
-
-/* ===========================================================================
- * Construct one Huffman tree and assigns the code bit strings and lengths.
- * Update the total bit length for the current block.
- * IN assertion: the field freq is set for all tree elements.
- * OUT assertions: the fields len and code are set to the optimal bit length
- *     and corresponding code. The length opt_len is updated; static_len is
- *     also updated if stree is not null. The field max_code is set.
- */
-function build_tree(s, desc)
-//    deflate_state *s;
-//    tree_desc *desc; /* the tree descriptor */
-{
-  var tree     = desc.dyn_tree;
-  var stree    = desc.stat_desc.static_tree;
-  var has_stree = desc.stat_desc.has_stree;
-  var elems    = desc.stat_desc.elems;
-  var n, m;          /* iterate over heap elements */
-  var max_code = -1; /* largest code with non zero frequency */
-  var node;          /* new node being created */
-
-  /* Construct the initial heap, with least frequent element in
-   * heap[SMALLEST]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
-   * heap[0] is not used.
-   */
-  s.heap_len = 0;
-  s.heap_max = HEAP_SIZE;
-
-  for (n = 0; n < elems; n++) {
-    if (tree[n * 2]/*.Freq*/ !== 0) {
-      s.heap[++s.heap_len] = max_code = n;
-      s.depth[n] = 0;
-
-    } else {
-      tree[n * 2 + 1]/*.Len*/ = 0;
-    }
-  }
-
-  /* The pkzip format requires that at least one distance code exists,
-   * and that at least one bit should be sent even if there is only one
-   * possible code. So to avoid special checks later on we force at least
-   * two codes of non zero frequency.
-   */
-  while (s.heap_len < 2) {
-    node = s.heap[++s.heap_len] = (max_code < 2 ? ++max_code : 0);
-    tree[node * 2]/*.Freq*/ = 1;
-    s.depth[node] = 0;
-    s.opt_len--;
-
-    if (has_stree) {
-      s.static_len -= stree[node * 2 + 1]/*.Len*/;
-    }
-    /* node is 0 or 1 so it does not have extra bits */
-  }
-  desc.max_code = max_code;
-
-  /* The elements heap[heap_len/2+1 .. heap_len] are leaves of the tree,
-   * establish sub-heaps of increasing lengths:
-   */
-  for (n = (s.heap_len >> 1/*int /2*/); n >= 1; n--) { pqdownheap(s, tree, n); }
-
-  /* Construct the Huffman tree by repeatedly combining the least two
-   * frequent nodes.
-   */
-  node = elems;              /* next internal node of the tree */
-  do {
-    //pqremove(s, tree, n);  /* n = node of least frequency */
-    /*** pqremove ***/
-    n = s.heap[1/*SMALLEST*/];
-    s.heap[1/*SMALLEST*/] = s.heap[s.heap_len--];
-    pqdownheap(s, tree, 1/*SMALLEST*/);
-    /***/
-
-    m = s.heap[1/*SMALLEST*/]; /* m = node of next least frequency */
-
-    s.heap[--s.heap_max] = n; /* keep the nodes sorted by frequency */
-    s.heap[--s.heap_max] = m;
-
-    /* Create a new node father of n and m */
-    tree[node * 2]/*.Freq*/ = tree[n * 2]/*.Freq*/ + tree[m * 2]/*.Freq*/;
-    s.depth[node] = (s.depth[n] >= s.depth[m] ? s.depth[n] : s.depth[m]) + 1;
-    tree[n * 2 + 1]/*.Dad*/ = tree[m * 2 + 1]/*.Dad*/ = node;
-
-    /* and insert the new node in the heap */
-    s.heap[1/*SMALLEST*/] = node++;
-    pqdownheap(s, tree, 1/*SMALLEST*/);
-
-  } while (s.heap_len >= 2);
-
-  s.heap[--s.heap_max] = s.heap[1/*SMALLEST*/];
-
-  /* At this point, the fields freq and dad are set. We can now
-   * generate the bit lengths.
-   */
-  gen_bitlen(s, desc);
-
-  /* The field len is now set, we can generate the bit codes */
-  gen_codes(tree, max_code, s.bl_count);
-}
-
-
-/* ===========================================================================
- * Scan a literal or distance tree to determine the frequencies of the codes
- * in the bit length tree.
- */
-function scan_tree(s, tree, max_code)
-//    deflate_state *s;
-//    ct_data *tree;   /* the tree to be scanned */
-//    int max_code;    /* and its largest code of non zero frequency */
-{
-  var n;                     /* iterates over all tree elements */
-  var prevlen = -1;          /* last emitted length */
-  var curlen;                /* length of current code */
-
-  var nextlen = tree[0 * 2 + 1]/*.Len*/; /* length of next code */
-
-  var count = 0;             /* repeat count of the current code */
-  var max_count = 7;         /* max repeat count */
-  var min_count = 4;         /* min repeat count */
-
-  if (nextlen === 0) {
-    max_count = 138;
-    min_count = 3;
-  }
-  tree[(max_code + 1) * 2 + 1]/*.Len*/ = 0xffff; /* guard */
-
-  for (n = 0; n <= max_code; n++) {
-    curlen = nextlen;
-    nextlen = tree[(n + 1) * 2 + 1]/*.Len*/;
-
-    if (++count < max_count && curlen === nextlen) {
-      continue;
-
-    } else if (count < min_count) {
-      s.bl_tree[curlen * 2]/*.Freq*/ += count;
-
-    } else if (curlen !== 0) {
-
-      if (curlen !== prevlen) { s.bl_tree[curlen * 2]/*.Freq*/++; }
-      s.bl_tree[REP_3_6 * 2]/*.Freq*/++;
-
-    } else if (count <= 10) {
-      s.bl_tree[REPZ_3_10 * 2]/*.Freq*/++;
-
-    } else {
-      s.bl_tree[REPZ_11_138 * 2]/*.Freq*/++;
-    }
-
-    count = 0;
-    prevlen = curlen;
-
-    if (nextlen === 0) {
-      max_count = 138;
-      min_count = 3;
-
-    } else if (curlen === nextlen) {
-      max_count = 6;
-      min_count = 3;
-
-    } else {
-      max_count = 7;
-      min_count = 4;
-    }
-  }
-}
-
-
-/* ===========================================================================
- * Send a literal or distance tree in compressed form, using the codes in
- * bl_tree.
- */
-function send_tree(s, tree, max_code)
-//    deflate_state *s;
-//    ct_data *tree; /* the tree to be scanned */
-//    int max_code;       /* and its largest code of non zero frequency */
-{
-  var n;                     /* iterates over all tree elements */
-  var prevlen = -1;          /* last emitted length */
-  var curlen;                /* length of current code */
-
-  var nextlen = tree[0 * 2 + 1]/*.Len*/; /* length of next code */
-
-  var count = 0;             /* repeat count of the current code */
-  var max_count = 7;         /* max repeat count */
-  var min_count = 4;         /* min repeat count */
-
-  /* tree[max_code+1].Len = -1; */  /* guard already set */
-  if (nextlen === 0) {
-    max_count = 138;
-    min_count = 3;
-  }
-
-  for (n = 0; n <= max_code; n++) {
-    curlen = nextlen;
-    nextlen = tree[(n + 1) * 2 + 1]/*.Len*/;
-
-    if (++count < max_count && curlen === nextlen) {
-      continue;
-
-    } else if (count < min_count) {
-      do { send_code(s, curlen, s.bl_tree); } while (--count !== 0);
-
-    } else if (curlen !== 0) {
-      if (curlen !== prevlen) {
-        send_code(s, curlen, s.bl_tree);
-        count--;
-      }
-      //Assert(count >= 3 && count <= 6, " 3_6?");
-      send_code(s, REP_3_6, s.bl_tree);
-      send_bits(s, count - 3, 2);
-
-    } else if (count <= 10) {
-      send_code(s, REPZ_3_10, s.bl_tree);
-      send_bits(s, count - 3, 3);
-
-    } else {
-      send_code(s, REPZ_11_138, s.bl_tree);
-      send_bits(s, count - 11, 7);
-    }
-
-    count = 0;
-    prevlen = curlen;
-    if (nextlen === 0) {
-      max_count = 138;
-      min_count = 3;
-
-    } else if (curlen === nextlen) {
-      max_count = 6;
-      min_count = 3;
-
-    } else {
-      max_count = 7;
-      min_count = 4;
-    }
-  }
-}
-
-
-/* ===========================================================================
- * Construct the Huffman tree for the bit lengths and return the index in
- * bl_order of the last bit length code to send.
- */
-function build_bl_tree(s) {
-  var max_blindex;  /* index of last bit length code of non zero freq */
-
-  /* Determine the bit length frequencies for literal and distance trees */
-  scan_tree(s, s.dyn_ltree, s.l_desc.max_code);
-  scan_tree(s, s.dyn_dtree, s.d_desc.max_code);
-
-  /* Build the bit length tree: */
-  build_tree(s, s.bl_desc);
-  /* opt_len now includes the length of the tree representations, except
-   * the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
-   */
-
-  /* Determine the number of bit length codes to send. The pkzip format
-   * requires that at least 4 bit length codes be sent. (appnote.txt says
-   * 3 but the actual value used is 4.)
-   */
-  for (max_blindex = BL_CODES - 1; max_blindex >= 3; max_blindex--) {
-    if (s.bl_tree[bl_order[max_blindex] * 2 + 1]/*.Len*/ !== 0) {
-      break;
-    }
-  }
-  /* Update opt_len to include the bit length tree and counts */
-  s.opt_len += 3 * (max_blindex + 1) + 5 + 5 + 4;
-  //Tracev((stderr, "\ndyn trees: dyn %ld, stat %ld",
-  //        s->opt_len, s->static_len));
-
-  return max_blindex;
-}
-
-
-/* ===========================================================================
- * Send the header for a block using dynamic Huffman trees: the counts, the
- * lengths of the bit length codes, the literal tree and the distance tree.
- * IN assertion: lcodes >= 257, dcodes >= 1, blcodes >= 4.
- */
-function send_all_trees(s, lcodes, dcodes, blcodes)
-//    deflate_state *s;
-//    int lcodes, dcodes, blcodes; /* number of codes for each tree */
-{
-  var rank;                    /* index in bl_order */
-
-  //Assert (lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
-  //Assert (lcodes <= L_CODES && dcodes <= D_CODES && blcodes <= BL_CODES,
-  //        "too many codes");
-  //Tracev((stderr, "\nbl counts: "));
-  send_bits(s, lcodes - 257, 5); /* not +255 as stated in appnote.txt */
-  send_bits(s, dcodes - 1,   5);
-  send_bits(s, blcodes - 4,  4); /* not -3 as stated in appnote.txt */
-  for (rank = 0; rank < blcodes; rank++) {
-    //Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
-    send_bits(s, s.bl_tree[bl_order[rank] * 2 + 1]/*.Len*/, 3);
-  }
-  //Tracev((stderr, "\nbl tree: sent %ld", s->bits_sent));
-
-  send_tree(s, s.dyn_ltree, lcodes - 1); /* literal tree */
-  //Tracev((stderr, "\nlit tree: sent %ld", s->bits_sent));
-
-  send_tree(s, s.dyn_dtree, dcodes - 1); /* distance tree */
-  //Tracev((stderr, "\ndist tree: sent %ld", s->bits_sent));
-}
-
-
-/* ===========================================================================
- * Check if the data type is TEXT or BINARY, using the following algorithm:
- * - TEXT if the two conditions below are satisfied:
- *    a) There are no non-portable control characters belonging to the
- *       "black list" (0..6, 14..25, 28..31).
- *    b) There is at least one printable character belonging to the
- *       "white list" (9 {TAB}, 10 {LF}, 13 {CR}, 32..255).
- * - BINARY otherwise.
- * - The following partially-portable control characters form a
- *   "gray list" that is ignored in this detection algorithm:
- *   (7 {BEL}, 8 {BS}, 11 {VT}, 12 {FF}, 26 {SUB}, 27 {ESC}).
- * IN assertion: the fields Freq of dyn_ltree are set.
- */
-function detect_data_type(s) {
-  /* black_mask is the bit mask of black-listed bytes
-   * set bits 0..6, 14..25, and 28..31
-   * 0xf3ffc07f = binary 11110011111111111100000001111111
-   */
-  var black_mask = 0xf3ffc07f;
-  var n;
-
-  /* Check for non-textual ("black-listed") bytes. */
-  for (n = 0; n <= 31; n++, black_mask >>>= 1) {
-    if ((black_mask & 1) && (s.dyn_ltree[n * 2]/*.Freq*/ !== 0)) {
-      return Z_BINARY;
-    }
-  }
-
-  /* Check for textual ("white-listed") bytes. */
-  if (s.dyn_ltree[9 * 2]/*.Freq*/ !== 0 || s.dyn_ltree[10 * 2]/*.Freq*/ !== 0 ||
-      s.dyn_ltree[13 * 2]/*.Freq*/ !== 0) {
-    return Z_TEXT;
-  }
-  for (n = 32; n < LITERALS; n++) {
-    if (s.dyn_ltree[n * 2]/*.Freq*/ !== 0) {
-      return Z_TEXT;
-    }
-  }
-
-  /* There are no "black-listed" or "white-listed" bytes:
-   * this stream either is empty or has tolerated ("gray-listed") bytes only.
-   */
-  return Z_BINARY;
-}
-
-
-var static_init_done = false;
-
-/* ===========================================================================
- * Initialize the tree data structures for a new zlib stream.
- */
-function _tr_init(s)
-{
-
-  if (!static_init_done) {
-    tr_static_init();
-    static_init_done = true;
-  }
-
-  s.l_desc  = new TreeDesc(s.dyn_ltree, static_l_desc);
-  s.d_desc  = new TreeDesc(s.dyn_dtree, static_d_desc);
-  s.bl_desc = new TreeDesc(s.bl_tree, static_bl_desc);
-
-  s.bi_buf = 0;
-  s.bi_valid = 0;
-
-  /* Initialize the first block of the first file: */
-  init_block(s);
-}
-
-
-/* ===========================================================================
- * Send a stored block
- */
-function _tr_stored_block(s, buf, stored_len, last)
-//DeflateState *s;
-//charf *buf;       /* input block */
-//ulg stored_len;   /* length of input block */
-//int last;         /* one if this is the last block for a file */
-{
-  send_bits(s, (STORED_BLOCK << 1) + (last ? 1 : 0), 3);    /* send block type */
-  copy_block(s, buf, stored_len, true); /* with header */
-}
-
-
-/* ===========================================================================
- * Send one empty static block to give enough lookahead for inflate.
- * This takes 10 bits, of which 7 may remain in the bit buffer.
- */
-function _tr_align(s) {
-  send_bits(s, STATIC_TREES << 1, 3);
-  send_code(s, END_BLOCK, static_ltree);
-  bi_flush(s);
-}
-
-
-/* ===========================================================================
- * Determine the best encoding for the current block: dynamic trees, static
- * trees or store, and output the encoded block to the zip file.
- */
-function _tr_flush_block(s, buf, stored_len, last)
-//DeflateState *s;
-//charf *buf;       /* input block, or NULL if too old */
-//ulg stored_len;   /* length of input block */
-//int last;         /* one if this is the last block for a file */
-{
-  var opt_lenb, static_lenb;  /* opt_len and static_len in bytes */
-  var max_blindex = 0;        /* index of last bit length code of non zero freq */
-
-  /* Build the Huffman trees unless a stored block is forced */
-  if (s.level > 0) {
-
-    /* Check if the file is binary or text */
-    if (s.strm.data_type === Z_UNKNOWN) {
-      s.strm.data_type = detect_data_type(s);
-    }
-
-    /* Construct the literal and distance trees */
-    build_tree(s, s.l_desc);
-    // Tracev((stderr, "\nlit data: dyn %ld, stat %ld", s->opt_len,
-    //        s->static_len));
-
-    build_tree(s, s.d_desc);
-    // Tracev((stderr, "\ndist data: dyn %ld, stat %ld", s->opt_len,
-    //        s->static_len));
-    /* At this point, opt_len and static_len are the total bit lengths of
-     * the compressed block data, excluding the tree representations.
-     */
-
-    /* Build the bit length tree for the above two trees, and get the index
-     * in bl_order of the last bit length code to send.
-     */
-    max_blindex = build_bl_tree(s);
-
-    /* Determine the best encoding. Compute the block lengths in bytes. */
-    opt_lenb = (s.opt_len + 3 + 7) >>> 3;
-    static_lenb = (s.static_len + 3 + 7) >>> 3;
-
-    // Tracev((stderr, "\nopt %lu(%lu) stat %lu(%lu) stored %lu lit %u ",
-    //        opt_lenb, s->opt_len, static_lenb, s->static_len, stored_len,
-    //        s->last_lit));
-
-    if (static_lenb <= opt_lenb) { opt_lenb = static_lenb; }
-
-  } else {
-    // Assert(buf != (char*)0, "lost buf");
-    opt_lenb = static_lenb = stored_len + 5; /* force a stored block */
-  }
-
-  if ((stored_len + 4 <= opt_lenb) && (buf !== -1)) {
-    /* 4: two words for the lengths */
-
-    /* The test buf != NULL is only necessary if LIT_BUFSIZE > WSIZE.
-     * Otherwise we can't have processed more than WSIZE input bytes since
-     * the last block flush, because compression would have been
-     * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
-     * transform a block into a stored block.
-     */
-    _tr_stored_block(s, buf, stored_len, last);
-
-  } else if (s.strategy === Z_FIXED || static_lenb === opt_lenb) {
-
-    send_bits(s, (STATIC_TREES << 1) + (last ? 1 : 0), 3);
-    compress_block(s, static_ltree, static_dtree);
-
-  } else {
-    send_bits(s, (DYN_TREES << 1) + (last ? 1 : 0), 3);
-    send_all_trees(s, s.l_desc.max_code + 1, s.d_desc.max_code + 1, max_blindex + 1);
-    compress_block(s, s.dyn_ltree, s.dyn_dtree);
-  }
-  // Assert (s->compressed_len == s->bits_sent, "bad compressed size");
-  /* The above check is made mod 2^32, for files larger than 512 MB
-   * and uLong implemented on 32 bits.
-   */
-  init_block(s);
-
-  if (last) {
-    bi_windup(s);
-  }
-  // Tracev((stderr,"\ncomprlen %lu(%lu) ", s->compressed_len>>3,
-  //       s->compressed_len-7*last));
-}
-
-/* ===========================================================================
- * Save the match info and tally the frequency counts. Return true if
- * the current block must be flushed.
- */
-function _tr_tally(s, dist, lc)
-//    deflate_state *s;
-//    unsigned dist;  /* distance of matched string */
-//    unsigned lc;    /* match length-MIN_MATCH or unmatched char (if dist==0) */
-{
-  //var out_length, in_length, dcode;
-
-  s.pending_buf[s.d_buf + s.last_lit * 2]     = (dist >>> 8) & 0xff;
-  s.pending_buf[s.d_buf + s.last_lit * 2 + 1] = dist & 0xff;
-
-  s.pending_buf[s.l_buf + s.last_lit] = lc & 0xff;
-  s.last_lit++;
-
-  if (dist === 0) {
-    /* lc is the unmatched char */
-    s.dyn_ltree[lc * 2]/*.Freq*/++;
-  } else {
-    s.matches++;
-    /* Here, lc is the match length - MIN_MATCH */
-    dist--;             /* dist = match distance - 1 */
-    //Assert((ush)dist < (ush)MAX_DIST(s) &&
-    //       (ush)lc <= (ush)(MAX_MATCH-MIN_MATCH) &&
-    //       (ush)d_code(dist) < (ush)D_CODES,  "_tr_tally: bad match");
-
-    s.dyn_ltree[(_length_code[lc] + LITERALS + 1) * 2]/*.Freq*/++;
-    s.dyn_dtree[d_code(dist) * 2]/*.Freq*/++;
-  }
-
-// (!) This block is disabled in zlib defaults,
-// don't enable it for binary compatibility
-
-//#ifdef TRUNCATE_BLOCK
-//  /* Try to guess if it is profitable to stop the current block here */
-//  if ((s.last_lit & 0x1fff) === 0 && s.level > 2) {
-//    /* Compute an upper bound for the compressed length */
-//    out_length = s.last_lit*8;
-//    in_length = s.strstart - s.block_start;
-//
-//    for (dcode = 0; dcode < D_CODES; dcode++) {
-//      out_length += s.dyn_dtree[dcode*2]/*.Freq*/ * (5 + extra_dbits[dcode]);
-//    }
-//    out_length >>>= 3;
-//    //Tracev((stderr,"\nlast_lit %u, in %ld, out ~%ld(%ld%%) ",
-//    //       s->last_lit, in_length, out_length,
-//    //       100L - out_length*100L/in_length));
-//    if (s.matches < (s.last_lit>>1)/*int /2*/ && out_length < (in_length>>1)/*int /2*/) {
-//      return true;
-//    }
-//  }
-//#endif
-
-  return (s.last_lit === s.lit_bufsize - 1);
-  /* We avoid equality with lit_bufsize because of wraparound at 64K
-   * on 16 bit machines and because stored blocks are restricted to
-   * 64K-1 bytes.
-   */
-}
-
-exports._tr_init  = _tr_init;
-exports._tr_stored_block = _tr_stored_block;
-exports._tr_flush_block  = _tr_flush_block;
-exports._tr_tally = _tr_tally;
-exports._tr_align = _tr_align;
-
-
-/***/ }),
-/* 484 */,
-/* 485 */,
-/* 486 */,
-/* 487 */,
-/* 488 */,
-/* 489 */,
-/* 490 */
+/***/ 490:
 /***/ (function(__unusedmodule, exports) {
 
 // Copyright Joyent, Inc. and other Node contributors.
@@ -22968,1461 +17879,8 @@ function objectToString(o) {
 
 
 /***/ }),
-/* 491 */,
-/* 492 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-
-var colorString = __webpack_require__(798);
-var convert = __webpack_require__(535);
-
-var _slice = [].slice;
-
-var skippedModels = [
-	// to be honest, I don't really feel like keyword belongs in color convert, but eh.
-	'keyword',
-
-	// gray conflicts with some method names, and has its own method defined.
-	'gray',
-
-	// shouldn't really be in color-convert either...
-	'hex'
-];
-
-var hashedModelKeys = {};
-Object.keys(convert).forEach(function (model) {
-	hashedModelKeys[_slice.call(convert[model].labels).sort().join('')] = model;
-});
-
-var limiters = {};
-
-function Color(obj, model) {
-	if (!(this instanceof Color)) {
-		return new Color(obj, model);
-	}
-
-	if (model && model in skippedModels) {
-		model = null;
-	}
-
-	if (model && !(model in convert)) {
-		throw new Error('Unknown model: ' + model);
-	}
-
-	var i;
-	var channels;
-
-	if (obj == null) { // eslint-disable-line no-eq-null,eqeqeq
-		this.model = 'rgb';
-		this.color = [0, 0, 0];
-		this.valpha = 1;
-	} else if (obj instanceof Color) {
-		this.model = obj.model;
-		this.color = obj.color.slice();
-		this.valpha = obj.valpha;
-	} else if (typeof obj === 'string') {
-		var result = colorString.get(obj);
-		if (result === null) {
-			throw new Error('Unable to parse color from string: ' + obj);
-		}
-
-		this.model = result.model;
-		channels = convert[this.model].channels;
-		this.color = result.value.slice(0, channels);
-		this.valpha = typeof result.value[channels] === 'number' ? result.value[channels] : 1;
-	} else if (obj.length) {
-		this.model = model || 'rgb';
-		channels = convert[this.model].channels;
-		var newArr = _slice.call(obj, 0, channels);
-		this.color = zeroArray(newArr, channels);
-		this.valpha = typeof obj[channels] === 'number' ? obj[channels] : 1;
-	} else if (typeof obj === 'number') {
-		// this is always RGB - can be converted later on.
-		obj &= 0xFFFFFF;
-		this.model = 'rgb';
-		this.color = [
-			(obj >> 16) & 0xFF,
-			(obj >> 8) & 0xFF,
-			obj & 0xFF
-		];
-		this.valpha = 1;
-	} else {
-		this.valpha = 1;
-
-		var keys = Object.keys(obj);
-		if ('alpha' in obj) {
-			keys.splice(keys.indexOf('alpha'), 1);
-			this.valpha = typeof obj.alpha === 'number' ? obj.alpha : 0;
-		}
-
-		var hashedKeys = keys.sort().join('');
-		if (!(hashedKeys in hashedModelKeys)) {
-			throw new Error('Unable to parse color from object: ' + JSON.stringify(obj));
-		}
-
-		this.model = hashedModelKeys[hashedKeys];
-
-		var labels = convert[this.model].labels;
-		var color = [];
-		for (i = 0; i < labels.length; i++) {
-			color.push(obj[labels[i]]);
-		}
-
-		this.color = zeroArray(color);
-	}
-
-	// perform limitations (clamping, etc.)
-	if (limiters[this.model]) {
-		channels = convert[this.model].channels;
-		for (i = 0; i < channels; i++) {
-			var limit = limiters[this.model][i];
-			if (limit) {
-				this.color[i] = limit(this.color[i]);
-			}
-		}
-	}
-
-	this.valpha = Math.max(0, Math.min(1, this.valpha));
-
-	if (Object.freeze) {
-		Object.freeze(this);
-	}
-}
-
-Color.prototype = {
-	toString: function () {
-		return this.string();
-	},
-
-	toJSON: function () {
-		return this[this.model]();
-	},
-
-	string: function (places) {
-		var self = this.model in colorString.to ? this : this.rgb();
-		self = self.round(typeof places === 'number' ? places : 1);
-		var args = self.valpha === 1 ? self.color : self.color.concat(this.valpha);
-		return colorString.to[self.model](args);
-	},
-
-	percentString: function (places) {
-		var self = this.rgb().round(typeof places === 'number' ? places : 1);
-		var args = self.valpha === 1 ? self.color : self.color.concat(this.valpha);
-		return colorString.to.rgb.percent(args);
-	},
-
-	array: function () {
-		return this.valpha === 1 ? this.color.slice() : this.color.concat(this.valpha);
-	},
-
-	object: function () {
-		var result = {};
-		var channels = convert[this.model].channels;
-		var labels = convert[this.model].labels;
-
-		for (var i = 0; i < channels; i++) {
-			result[labels[i]] = this.color[i];
-		}
-
-		if (this.valpha !== 1) {
-			result.alpha = this.valpha;
-		}
-
-		return result;
-	},
-
-	unitArray: function () {
-		var rgb = this.rgb().color;
-		rgb[0] /= 255;
-		rgb[1] /= 255;
-		rgb[2] /= 255;
-
-		if (this.valpha !== 1) {
-			rgb.push(this.valpha);
-		}
-
-		return rgb;
-	},
-
-	unitObject: function () {
-		var rgb = this.rgb().object();
-		rgb.r /= 255;
-		rgb.g /= 255;
-		rgb.b /= 255;
-
-		if (this.valpha !== 1) {
-			rgb.alpha = this.valpha;
-		}
-
-		return rgb;
-	},
-
-	round: function (places) {
-		places = Math.max(places || 0, 0);
-		return new Color(this.color.map(roundToPlace(places)).concat(this.valpha), this.model);
-	},
-
-	alpha: function (val) {
-		if (arguments.length) {
-			return new Color(this.color.concat(Math.max(0, Math.min(1, val))), this.model);
-		}
-
-		return this.valpha;
-	},
-
-	// rgb
-	red: getset('rgb', 0, maxfn(255)),
-	green: getset('rgb', 1, maxfn(255)),
-	blue: getset('rgb', 2, maxfn(255)),
-
-	hue: getset(['hsl', 'hsv', 'hsl', 'hwb', 'hcg'], 0, function (val) { return ((val % 360) + 360) % 360; }), // eslint-disable-line brace-style
-
-	saturationl: getset('hsl', 1, maxfn(100)),
-	lightness: getset('hsl', 2, maxfn(100)),
-
-	saturationv: getset('hsv', 1, maxfn(100)),
-	value: getset('hsv', 2, maxfn(100)),
-
-	chroma: getset('hcg', 1, maxfn(100)),
-	gray: getset('hcg', 2, maxfn(100)),
-
-	white: getset('hwb', 1, maxfn(100)),
-	wblack: getset('hwb', 2, maxfn(100)),
-
-	cyan: getset('cmyk', 0, maxfn(100)),
-	magenta: getset('cmyk', 1, maxfn(100)),
-	yellow: getset('cmyk', 2, maxfn(100)),
-	black: getset('cmyk', 3, maxfn(100)),
-
-	x: getset('xyz', 0, maxfn(100)),
-	y: getset('xyz', 1, maxfn(100)),
-	z: getset('xyz', 2, maxfn(100)),
-
-	l: getset('lab', 0, maxfn(100)),
-	a: getset('lab', 1),
-	b: getset('lab', 2),
-
-	keyword: function (val) {
-		if (arguments.length) {
-			return new Color(val);
-		}
-
-		return convert[this.model].keyword(this.color);
-	},
-
-	hex: function (val) {
-		if (arguments.length) {
-			return new Color(val);
-		}
-
-		return colorString.to.hex(this.rgb().round().color);
-	},
-
-	rgbNumber: function () {
-		var rgb = this.rgb().color;
-		return ((rgb[0] & 0xFF) << 16) | ((rgb[1] & 0xFF) << 8) | (rgb[2] & 0xFF);
-	},
-
-	luminosity: function () {
-		// http://www.w3.org/TR/WCAG20/#relativeluminancedef
-		var rgb = this.rgb().color;
-
-		var lum = [];
-		for (var i = 0; i < rgb.length; i++) {
-			var chan = rgb[i] / 255;
-			lum[i] = (chan <= 0.03928) ? chan / 12.92 : Math.pow(((chan + 0.055) / 1.055), 2.4);
-		}
-
-		return 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
-	},
-
-	contrast: function (color2) {
-		// http://www.w3.org/TR/WCAG20/#contrast-ratiodef
-		var lum1 = this.luminosity();
-		var lum2 = color2.luminosity();
-
-		if (lum1 > lum2) {
-			return (lum1 + 0.05) / (lum2 + 0.05);
-		}
-
-		return (lum2 + 0.05) / (lum1 + 0.05);
-	},
-
-	level: function (color2) {
-		var contrastRatio = this.contrast(color2);
-		if (contrastRatio >= 7.1) {
-			return 'AAA';
-		}
-
-		return (contrastRatio >= 4.5) ? 'AA' : '';
-	},
-
-	isDark: function () {
-		// YIQ equation from http://24ways.org/2010/calculating-color-contrast
-		var rgb = this.rgb().color;
-		var yiq = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000;
-		return yiq < 128;
-	},
-
-	isLight: function () {
-		return !this.isDark();
-	},
-
-	negate: function () {
-		var rgb = this.rgb();
-		for (var i = 0; i < 3; i++) {
-			rgb.color[i] = 255 - rgb.color[i];
-		}
-		return rgb;
-	},
-
-	lighten: function (ratio) {
-		var hsl = this.hsl();
-		hsl.color[2] += hsl.color[2] * ratio;
-		return hsl;
-	},
-
-	darken: function (ratio) {
-		var hsl = this.hsl();
-		hsl.color[2] -= hsl.color[2] * ratio;
-		return hsl;
-	},
-
-	saturate: function (ratio) {
-		var hsl = this.hsl();
-		hsl.color[1] += hsl.color[1] * ratio;
-		return hsl;
-	},
-
-	desaturate: function (ratio) {
-		var hsl = this.hsl();
-		hsl.color[1] -= hsl.color[1] * ratio;
-		return hsl;
-	},
-
-	whiten: function (ratio) {
-		var hwb = this.hwb();
-		hwb.color[1] += hwb.color[1] * ratio;
-		return hwb;
-	},
-
-	blacken: function (ratio) {
-		var hwb = this.hwb();
-		hwb.color[2] += hwb.color[2] * ratio;
-		return hwb;
-	},
-
-	grayscale: function () {
-		// http://en.wikipedia.org/wiki/Grayscale#Converting_color_to_grayscale
-		var rgb = this.rgb().color;
-		var val = rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11;
-		return Color.rgb(val, val, val);
-	},
-
-	fade: function (ratio) {
-		return this.alpha(this.valpha - (this.valpha * ratio));
-	},
-
-	opaquer: function (ratio) {
-		return this.alpha(this.valpha + (this.valpha * ratio));
-	},
-
-	rotate: function (degrees) {
-		var hsl = this.hsl();
-		var hue = hsl.color[0];
-		hue = (hue + degrees) % 360;
-		hue = hue < 0 ? 360 + hue : hue;
-		hsl.color[0] = hue;
-		return hsl;
-	},
-
-	mix: function (mixinColor, weight) {
-		// ported from sass implementation in C
-		// https://github.com/sass/libsass/blob/0e6b4a2850092356aa3ece07c6b249f0221caced/functions.cpp#L209
-		if (!mixinColor || !mixinColor.rgb) {
-			throw new Error('Argument to "mix" was not a Color instance, but rather an instance of ' + typeof mixinColor);
-		}
-		var color1 = mixinColor.rgb();
-		var color2 = this.rgb();
-		var p = weight === undefined ? 0.5 : weight;
-
-		var w = 2 * p - 1;
-		var a = color1.alpha() - color2.alpha();
-
-		var w1 = (((w * a === -1) ? w : (w + a) / (1 + w * a)) + 1) / 2.0;
-		var w2 = 1 - w1;
-
-		return Color.rgb(
-				w1 * color1.red() + w2 * color2.red(),
-				w1 * color1.green() + w2 * color2.green(),
-				w1 * color1.blue() + w2 * color2.blue(),
-				color1.alpha() * p + color2.alpha() * (1 - p));
-	}
-};
-
-// model conversion methods and static constructors
-Object.keys(convert).forEach(function (model) {
-	if (skippedModels.indexOf(model) !== -1) {
-		return;
-	}
-
-	var channels = convert[model].channels;
-
-	// conversion methods
-	Color.prototype[model] = function () {
-		if (this.model === model) {
-			return new Color(this);
-		}
-
-		if (arguments.length) {
-			return new Color(arguments, model);
-		}
-
-		var newAlpha = typeof arguments[channels] === 'number' ? channels : this.valpha;
-		return new Color(assertArray(convert[this.model][model].raw(this.color)).concat(newAlpha), model);
-	};
-
-	// 'static' construction methods
-	Color[model] = function (color) {
-		if (typeof color === 'number') {
-			color = zeroArray(_slice.call(arguments), channels);
-		}
-		return new Color(color, model);
-	};
-});
-
-function roundTo(num, places) {
-	return Number(num.toFixed(places));
-}
-
-function roundToPlace(places) {
-	return function (num) {
-		return roundTo(num, places);
-	};
-}
-
-function getset(model, channel, modifier) {
-	model = Array.isArray(model) ? model : [model];
-
-	model.forEach(function (m) {
-		(limiters[m] || (limiters[m] = []))[channel] = modifier;
-	});
-
-	model = model[0];
-
-	return function (val) {
-		var result;
-
-		if (arguments.length) {
-			if (modifier) {
-				val = modifier(val);
-			}
-
-			result = this[model]();
-			result.color[channel] = val;
-			return result;
-		}
-
-		result = this[model]().color[channel];
-		if (modifier) {
-			result = modifier(result);
-		}
-
-		return result;
-	};
-}
-
-function maxfn(max) {
-	return function (v) {
-		return Math.max(0, Math.min(max, v));
-	};
-}
-
-function assertArray(val) {
-	return Array.isArray(val) ? val : [val];
-}
-
-function zeroArray(arr, length) {
-	for (var i = 0; i < length; i++) {
-		if (typeof arr[i] !== 'number') {
-			arr[i] = 0;
-		}
-	}
-
-	return arr;
-}
-
-module.exports = Color;
-
-
-/***/ }),
-/* 493 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const util = __webpack_require__(669);
-const stream = __webpack_require__(413);
-const is = __webpack_require__(64);
-
-__webpack_require__(852).hasVendoredLibvips();
-
-/* istanbul ignore next */
-try {
-  __webpack_require__(525);
-} catch (err) {
-  // Bail early if bindings aren't available
-  const help = ['', 'Something went wrong installing the "sharp" module', '', err.message, ''];
-  if (/NODE_MODULE_VERSION/.test(err.message)) {
-    help.push('- Ensure the version of Node.js used at install time matches that used at runtime');
-  } else if (/invalid ELF header/.test(err.message)) {
-    help.push(`- Ensure "${process.platform}" is used at install time as well as runtime`);
-  } else if (/dylib/.test(err.message) && /Incompatible library version/.test(err.message)) {
-    help.push('- Run "brew update && brew upgrade vips"');
-  } else {
-    help.push(
-      '- Remove the "node_modules/sharp" directory then run',
-      '  "npm install --ignore-scripts=false --verbose sharp" and look for errors'
-    );
-  }
-  help.push(
-    '- Consult the installation documentation at https://sharp.pixelplumbing.com/install',
-    '- Search for this error at https://github.com/lovell/sharp/issues', ''
-  );
-  const error = help.join('\n');
-  throw new Error(error);
-}
-
-// Use NODE_DEBUG=sharp to enable libvips warnings
-const debuglog = util.debuglog('sharp');
-
-/**
- * Constructor factory to create an instance of `sharp`, to which further methods are chained.
- *
- * JPEG, PNG, WebP, AVIF or TIFF format image data can be streamed out from this object.
- * When using Stream based output, derived attributes are available from the `info` event.
- *
- * Non-critical problems encountered during processing are emitted as `warning` events.
- *
- * Implements the [stream.Duplex](http://nodejs.org/api/stream.html#stream_class_stream_duplex) class.
- *
- * @constructs Sharp
- *
- * @emits Sharp#info
- * @emits Sharp#warning
- *
- * @example
- * sharp('input.jpg')
- *   .resize(300, 200)
- *   .toFile('output.jpg', function(err) {
- *     // output.jpg is a 300 pixels wide and 200 pixels high image
- *     // containing a scaled and cropped version of input.jpg
- *   });
- *
- * @example
- * // Read image data from readableStream,
- * // resize to 300 pixels wide,
- * // emit an 'info' event with calculated dimensions
- * // and finally write image data to writableStream
- * var transformer = sharp()
- *   .resize(300)
- *   .on('info', function(info) {
- *     console.log('Image height is ' + info.height);
- *   });
- * readableStream.pipe(transformer).pipe(writableStream);
- *
- * @example
- * // Create a blank 300x200 PNG image of semi-transluent red pixels
- * sharp({
- *   create: {
- *     width: 300,
- *     height: 200,
- *     channels: 4,
- *     background: { r: 255, g: 0, b: 0, alpha: 0.5 }
- *   }
- * })
- * .png()
- * .toBuffer()
- * .then( ... );
- *
- * @example
- * // Convert an animated GIF to an animated WebP
- * await sharp('in.gif', { animated: true }).toFile('out.webp');
- *
- * @example
- * // Read a raw array of pixels and save it to a png
- * const input = Uint8Array.from([255, 255, 255, 0, 0, 0]); // or Uint8ClampedArray
- * const image = sharp(input, {
- *   // because the input does not contain its dimensions or how many channels it has
- *   // we need to specify it in the constructor options
- *   raw: {
- *     width: 2,
- *     height: 1,
- *     channels: 3
- *   }
- * });
- * await image.toFile('my-two-pixels.png');
- *
- * @example
- * // Generate RGB Gaussian noise
- * await sharp({
- *   create: {
- *     width: 300,
- *     height: 200,
- *     channels: 3,
- *     noise: {
- *       type: 'gaussian',
- *       mean: 128,
- *       sigma: 30
- *     }
- *  }
- * }).toFile('noise.png');
- *
- * @param {(Buffer|Uint8Array|Uint8ClampedArray|string)} [input] - if present, can be
- *  a Buffer / Uint8Array / Uint8ClampedArray containing JPEG, PNG, WebP, AVIF, GIF, SVG, TIFF or raw pixel image data, or
- *  a String containing the filesystem path to an JPEG, PNG, WebP, AVIF, GIF, SVG or TIFF image file.
- *  JPEG, PNG, WebP, AVIF, GIF, SVG, TIFF or raw pixel image data can be streamed into the object when not present.
- * @param {Object} [options] - if present, is an Object with optional attributes.
- * @param {boolean} [options.failOnError=true] - by default halt processing and raise an error when loading invalid images.
- *  Set this flag to `false` if you'd rather apply a "best effort" to decode images, even if the data is corrupt or invalid.
- * @param {number|boolean} [options.limitInputPixels=268402689] - Do not process input images where the number of pixels
- *  (width x height) exceeds this limit. Assumes image dimensions contained in the input metadata can be trusted.
- *  An integral Number of pixels, zero or false to remove limit, true to use default limit of 268402689 (0x3FFF x 0x3FFF).
- * @param {boolean} [options.sequentialRead=false] - Set this to `true` to use sequential rather than random access where possible.
- *  This can reduce memory usage and might improve performance on some systems.
- * @param {number} [options.density=72] - number representing the DPI for vector images in the range 1 to 100000.
- * @param {number} [options.pages=1] - number of pages to extract for multi-page input (GIF, WebP, AVIF, TIFF, PDF), use -1 for all pages.
- * @param {number} [options.page=0] - page number to start extracting from for multi-page input (GIF, WebP, AVIF, TIFF, PDF), zero based.
- * @param {number} [options.subifd=-1] - subIFD (Sub Image File Directory) to extract for OME-TIFF, defaults to main image.
- * @param {number} [options.level=0] - level to extract from a multi-level input (OpenSlide), zero based.
- * @param {boolean} [options.animated=false] - Set to `true` to read all frames/pages of an animated image (equivalent of setting `pages` to `-1`).
- * @param {Object} [options.raw] - describes raw pixel input image data. See `raw()` for pixel ordering.
- * @param {number} [options.raw.width] - integral number of pixels wide.
- * @param {number} [options.raw.height] - integral number of pixels high.
- * @param {number} [options.raw.channels] - integral number of channels, between 1 and 4.
- * @param {Object} [options.create] - describes a new image to be created.
- * @param {number} [options.create.width] - integral number of pixels wide.
- * @param {number} [options.create.height] - integral number of pixels high.
- * @param {number} [options.create.channels] - integral number of channels, either 3 (RGB) or 4 (RGBA).
- * @param {string|Object} [options.create.background] - parsed by the [color](https://www.npmjs.org/package/color) module to extract values for red, green, blue and alpha.
- * @param {Object} [options.create.noise] - describes a noise to be created.
- * @param {string} [options.create.noise.type] - type of generated noise, currently only `gaussian` is supported.
- * @param {number} [options.create.noise.mean] - mean of pixels in generated noise.
- * @param {number} [options.create.noise.sigma] - standard deviation of pixels in generated noise.
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-const Sharp = function (input, options) {
-  if (arguments.length === 1 && !is.defined(input)) {
-    throw new Error('Invalid input');
-  }
-  if (!(this instanceof Sharp)) {
-    return new Sharp(input, options);
-  }
-  stream.Duplex.call(this);
-  this.options = {
-    // resize options
-    topOffsetPre: -1,
-    leftOffsetPre: -1,
-    widthPre: -1,
-    heightPre: -1,
-    topOffsetPost: -1,
-    leftOffsetPost: -1,
-    widthPost: -1,
-    heightPost: -1,
-    width: -1,
-    height: -1,
-    canvas: 'crop',
-    position: 0,
-    resizeBackground: [0, 0, 0, 255],
-    useExifOrientation: false,
-    angle: 0,
-    rotationAngle: 0,
-    rotationBackground: [0, 0, 0, 255],
-    rotateBeforePreExtract: false,
-    flip: false,
-    flop: false,
-    extendTop: 0,
-    extendBottom: 0,
-    extendLeft: 0,
-    extendRight: 0,
-    extendBackground: [0, 0, 0, 255],
-    withoutEnlargement: false,
-    affineMatrix: [],
-    affineBackground: [0, 0, 0, 255],
-    affineIdx: 0,
-    affineIdy: 0,
-    affineOdx: 0,
-    affineOdy: 0,
-    affineInterpolator: this.constructor.interpolators.bilinear,
-    kernel: 'lanczos3',
-    fastShrinkOnLoad: true,
-    // operations
-    tintA: 128,
-    tintB: 128,
-    flatten: false,
-    flattenBackground: [0, 0, 0],
-    negate: false,
-    medianSize: 0,
-    blurSigma: 0,
-    sharpenSigma: 0,
-    sharpenFlat: 1,
-    sharpenJagged: 2,
-    threshold: 0,
-    thresholdGrayscale: true,
-    trimThreshold: 0,
-    gamma: 0,
-    gammaOut: 0,
-    greyscale: false,
-    normalise: false,
-    brightness: 1,
-    saturation: 1,
-    hue: 0,
-    booleanBufferIn: null,
-    booleanFileIn: '',
-    joinChannelIn: [],
-    extractChannel: -1,
-    removeAlpha: false,
-    ensureAlpha: -1,
-    colourspace: 'srgb',
-    composite: [],
-    // output
-    fileOut: '',
-    formatOut: 'input',
-    streamOut: false,
-    withMetadata: false,
-    withMetadataOrientation: -1,
-    withMetadataIcc: '',
-    withMetadataStrs: {},
-    resolveWithObject: false,
-    // output format
-    jpegQuality: 80,
-    jpegProgressive: false,
-    jpegChromaSubsampling: '4:2:0',
-    jpegTrellisQuantisation: false,
-    jpegOvershootDeringing: false,
-    jpegOptimiseScans: false,
-    jpegOptimiseCoding: true,
-    jpegQuantisationTable: 0,
-    pngProgressive: false,
-    pngCompressionLevel: 6,
-    pngAdaptiveFiltering: false,
-    pngPalette: false,
-    pngQuality: 100,
-    pngColours: 256,
-    pngDither: 1,
-    webpQuality: 80,
-    webpAlphaQuality: 100,
-    webpLossless: false,
-    webpNearLossless: false,
-    webpSmartSubsample: false,
-    webpReductionEffort: 4,
-    tiffQuality: 80,
-    tiffCompression: 'jpeg',
-    tiffPredictor: 'horizontal',
-    tiffPyramid: false,
-    tiffBitdepth: 8,
-    tiffTile: false,
-    tiffTileHeight: 256,
-    tiffTileWidth: 256,
-    tiffXres: 1.0,
-    tiffYres: 1.0,
-    heifQuality: 50,
-    heifLossless: false,
-    heifCompression: 'av1',
-    heifSpeed: 5,
-    heifChromaSubsampling: '4:2:0',
-    tileSize: 256,
-    tileOverlap: 0,
-    tileContainer: 'fs',
-    tileLayout: 'dz',
-    tileFormat: 'last',
-    tileDepth: 'last',
-    tileAngle: 0,
-    tileSkipBlanks: -1,
-    tileBackground: [255, 255, 255, 255],
-    tileCentre: false,
-    tileId: 'https://example.com/iiif',
-    linearA: 1,
-    linearB: 0,
-    // Function to notify of libvips warnings
-    debuglog: warning => {
-      this.emit('warning', warning);
-      debuglog(warning);
-    },
-    // Function to notify of queue length changes
-    queueListener: function (queueLength) {
-      Sharp.queue.emit('change', queueLength);
-    }
-  };
-  this.options.input = this._createInputDescriptor(input, options, { allowStream: true });
-  return this;
-};
-util.inherits(Sharp, stream.Duplex);
-
-/**
- * Take a "snapshot" of the Sharp instance, returning a new instance.
- * Cloned instances inherit the input of their parent instance.
- * This allows multiple output Streams and therefore multiple processing pipelines to share a single input Stream.
- *
- * @example
- * const pipeline = sharp().rotate();
- * pipeline.clone().resize(800, 600).pipe(firstWritableStream);
- * pipeline.clone().extract({ left: 20, top: 20, width: 100, height: 100 }).pipe(secondWritableStream);
- * readableStream.pipe(pipeline);
- * // firstWritableStream receives auto-rotated, resized readableStream
- * // secondWritableStream receives auto-rotated, extracted region of readableStream
- *
- * @example
- * // Create a pipeline that will download an image, resize it and format it to different files
- * // Using Promises to know when the pipeline is complete
- * const fs = require("fs");
- * const got = require("got");
- * const sharpStream = sharp({
- *   failOnError: false
- * });
- *
- * const promises = [];
- *
- * promises.push(
- *   sharpStream
- *     .clone()
- *     .jpeg({ quality: 100 })
- *     .toFile("originalFile.jpg")
- * );
- *
- * promises.push(
- *   sharpStream
- *     .clone()
- *     .resize({ width: 500 })
- *     .jpeg({ quality: 80 })
- *     .toFile("optimized-500.jpg")
- * );
- *
- * promises.push(
- *   sharpStream
- *     .clone()
- *     .resize({ width: 500 })
- *     .webp({ quality: 80 })
- *     .toFile("optimized-500.webp")
- * );
- *
- * // https://github.com/sindresorhus/got#gotstreamurl-options
- * got.stream("https://www.example.com/some-file.jpg").pipe(sharpStream);
- *
- * Promise.all(promises)
- *   .then(res => { console.log("Done!", res); })
- *   .catch(err => {
- *     console.error("Error processing files, let's clean it up", err);
- *     try {
- *       fs.unlinkSync("originalFile.jpg");
- *       fs.unlinkSync("optimized-500.jpg");
- *       fs.unlinkSync("optimized-500.webp");
- *     } catch (e) {}
- *   });
- *
- * @returns {Sharp}
- */
-function clone () {
-  // Clone existing options
-  const clone = this.constructor.call();
-  clone.options = Object.assign({}, this.options);
-  // Pass 'finish' event to clone for Stream-based input
-  if (this._isStreamInput()) {
-    this.on('finish', () => {
-      // Clone inherits input data
-      this._flattenBufferIn();
-      clone.options.bufferIn = this.options.bufferIn;
-      clone.emit('finish');
-    });
-  }
-  return clone;
-}
-Object.assign(Sharp.prototype, { clone });
-
-/**
- * Export constructor.
- * @private
- */
-module.exports = Sharp;
-
-
-/***/ }),
-/* 494 */,
-/* 495 */,
-/* 496 */,
-/* 497 */,
-/* 498 */,
-/* 499 */,
-/* 500 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-const Range = __webpack_require__(174)
-
-// Mostly just for testing and legacy API reasons
-const toComparators = (range, options) =>
-  new Range(range, options).set
-    .map(comp => comp.map(c => c.value).join(' ').trim().split(' '))
-
-module.exports = toComparators
-
-
-/***/ }),
-/* 501 */,
-/* 502 */,
-/* 503 */,
-/* 504 */,
-/* 505 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var url = __webpack_require__(835);
-var URL = url.URL;
-var http = __webpack_require__(605);
-var https = __webpack_require__(211);
-var Writable = __webpack_require__(413).Writable;
-var assert = __webpack_require__(59);
-var debug = __webpack_require__(456);
-
-// Create handlers that pass events from native requests
-var eventHandlers = Object.create(null);
-["abort", "aborted", "connect", "error", "socket", "timeout"].forEach(function (event) {
-  eventHandlers[event] = function (arg1, arg2, arg3) {
-    this._redirectable.emit(event, arg1, arg2, arg3);
-  };
-});
-
-// Error types with codes
-var RedirectionError = createErrorType(
-  "ERR_FR_REDIRECTION_FAILURE",
-  ""
-);
-var TooManyRedirectsError = createErrorType(
-  "ERR_FR_TOO_MANY_REDIRECTS",
-  "Maximum number of redirects exceeded"
-);
-var MaxBodyLengthExceededError = createErrorType(
-  "ERR_FR_MAX_BODY_LENGTH_EXCEEDED",
-  "Request body larger than maxBodyLength limit"
-);
-var WriteAfterEndError = createErrorType(
-  "ERR_STREAM_WRITE_AFTER_END",
-  "write after end"
-);
-
-// An HTTP(S) request that can be redirected
-function RedirectableRequest(options, responseCallback) {
-  // Initialize the request
-  Writable.call(this);
-  this._sanitizeOptions(options);
-  this._options = options;
-  this._ended = false;
-  this._ending = false;
-  this._redirectCount = 0;
-  this._redirects = [];
-  this._requestBodyLength = 0;
-  this._requestBodyBuffers = [];
-
-  // Attach a callback if passed
-  if (responseCallback) {
-    this.on("response", responseCallback);
-  }
-
-  // React to responses of native requests
-  var self = this;
-  this._onNativeResponse = function (response) {
-    self._processResponse(response);
-  };
-
-  // Perform the first request
-  this._performRequest();
-}
-RedirectableRequest.prototype = Object.create(Writable.prototype);
-
-RedirectableRequest.prototype.abort = function () {
-  // Abort the internal request
-  this._currentRequest.removeAllListeners();
-  this._currentRequest.on("error", noop);
-  this._currentRequest.abort();
-
-  // Abort this request
-  this.emit("abort");
-  this.removeAllListeners();
-};
-
-// Writes buffered data to the current native request
-RedirectableRequest.prototype.write = function (data, encoding, callback) {
-  // Writing is not allowed if end has been called
-  if (this._ending) {
-    throw new WriteAfterEndError();
-  }
-
-  // Validate input and shift parameters if necessary
-  if (!(typeof data === "string" || typeof data === "object" && ("length" in data))) {
-    throw new TypeError("data should be a string, Buffer or Uint8Array");
-  }
-  if (typeof encoding === "function") {
-    callback = encoding;
-    encoding = null;
-  }
-
-  // Ignore empty buffers, since writing them doesn't invoke the callback
-  // https://github.com/nodejs/node/issues/22066
-  if (data.length === 0) {
-    if (callback) {
-      callback();
-    }
-    return;
-  }
-  // Only write when we don't exceed the maximum body length
-  if (this._requestBodyLength + data.length <= this._options.maxBodyLength) {
-    this._requestBodyLength += data.length;
-    this._requestBodyBuffers.push({ data: data, encoding: encoding });
-    this._currentRequest.write(data, encoding, callback);
-  }
-  // Error when we exceed the maximum body length
-  else {
-    this.emit("error", new MaxBodyLengthExceededError());
-    this.abort();
-  }
-};
-
-// Ends the current native request
-RedirectableRequest.prototype.end = function (data, encoding, callback) {
-  // Shift parameters if necessary
-  if (typeof data === "function") {
-    callback = data;
-    data = encoding = null;
-  }
-  else if (typeof encoding === "function") {
-    callback = encoding;
-    encoding = null;
-  }
-
-  // Write data if needed and end
-  if (!data) {
-    this._ended = this._ending = true;
-    this._currentRequest.end(null, null, callback);
-  }
-  else {
-    var self = this;
-    var currentRequest = this._currentRequest;
-    this.write(data, encoding, function () {
-      self._ended = true;
-      currentRequest.end(null, null, callback);
-    });
-    this._ending = true;
-  }
-};
-
-// Sets a header value on the current native request
-RedirectableRequest.prototype.setHeader = function (name, value) {
-  this._options.headers[name] = value;
-  this._currentRequest.setHeader(name, value);
-};
-
-// Clears a header value on the current native request
-RedirectableRequest.prototype.removeHeader = function (name) {
-  delete this._options.headers[name];
-  this._currentRequest.removeHeader(name);
-};
-
-// Global timeout for all underlying requests
-RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
-  var self = this;
-  if (callback) {
-    this.on("timeout", callback);
-  }
-
-  // Sets up a timer to trigger a timeout event
-  function startTimer() {
-    if (self._timeout) {
-      clearTimeout(self._timeout);
-    }
-    self._timeout = setTimeout(function () {
-      self.emit("timeout");
-      clearTimer();
-    }, msecs);
-  }
-
-  // Prevent a timeout from triggering
-  function clearTimer() {
-    clearTimeout(this._timeout);
-    if (callback) {
-      self.removeListener("timeout", callback);
-    }
-    if (!this.socket) {
-      self._currentRequest.removeListener("socket", startTimer);
-    }
-  }
-
-  // Start the timer when the socket is opened
-  if (this.socket) {
-    startTimer();
-  }
-  else {
-    this._currentRequest.once("socket", startTimer);
-  }
-
-  this.once("response", clearTimer);
-  this.once("error", clearTimer);
-
-  return this;
-};
-
-// Proxy all other public ClientRequest methods
-[
-  "flushHeaders", "getHeader",
-  "setNoDelay", "setSocketKeepAlive",
-].forEach(function (method) {
-  RedirectableRequest.prototype[method] = function (a, b) {
-    return this._currentRequest[method](a, b);
-  };
-});
-
-// Proxy all public ClientRequest properties
-["aborted", "connection", "socket"].forEach(function (property) {
-  Object.defineProperty(RedirectableRequest.prototype, property, {
-    get: function () { return this._currentRequest[property]; },
-  });
-});
-
-RedirectableRequest.prototype._sanitizeOptions = function (options) {
-  // Ensure headers are always present
-  if (!options.headers) {
-    options.headers = {};
-  }
-
-  // Since http.request treats host as an alias of hostname,
-  // but the url module interprets host as hostname plus port,
-  // eliminate the host property to avoid confusion.
-  if (options.host) {
-    // Use hostname if set, because it has precedence
-    if (!options.hostname) {
-      options.hostname = options.host;
-    }
-    delete options.host;
-  }
-
-  // Complete the URL object when necessary
-  if (!options.pathname && options.path) {
-    var searchPos = options.path.indexOf("?");
-    if (searchPos < 0) {
-      options.pathname = options.path;
-    }
-    else {
-      options.pathname = options.path.substring(0, searchPos);
-      options.search = options.path.substring(searchPos);
-    }
-  }
-};
-
-
-// Executes the next native request (initial or redirect)
-RedirectableRequest.prototype._performRequest = function () {
-  // Load the native protocol
-  var protocol = this._options.protocol;
-  var nativeProtocol = this._options.nativeProtocols[protocol];
-  if (!nativeProtocol) {
-    this.emit("error", new TypeError("Unsupported protocol " + protocol));
-    return;
-  }
-
-  // If specified, use the agent corresponding to the protocol
-  // (HTTP and HTTPS use different types of agents)
-  if (this._options.agents) {
-    var scheme = protocol.substr(0, protocol.length - 1);
-    this._options.agent = this._options.agents[scheme];
-  }
-
-  // Create the native request
-  var request = this._currentRequest =
-        nativeProtocol.request(this._options, this._onNativeResponse);
-  this._currentUrl = url.format(this._options);
-
-  // Set up event handlers
-  request._redirectable = this;
-  for (var event in eventHandlers) {
-    /* istanbul ignore else */
-    if (event) {
-      request.on(event, eventHandlers[event]);
-    }
-  }
-
-  // End a redirected request
-  // (The first request must be ended explicitly with RedirectableRequest#end)
-  if (this._isRedirect) {
-    // Write the request entity and end.
-    var i = 0;
-    var self = this;
-    var buffers = this._requestBodyBuffers;
-    (function writeNext(error) {
-      // Only write if this request has not been redirected yet
-      /* istanbul ignore else */
-      if (request === self._currentRequest) {
-        // Report any write errors
-        /* istanbul ignore if */
-        if (error) {
-          self.emit("error", error);
-        }
-        // Write the next buffer if there are still left
-        else if (i < buffers.length) {
-          var buffer = buffers[i++];
-          /* istanbul ignore else */
-          if (!request.finished) {
-            request.write(buffer.data, buffer.encoding, writeNext);
-          }
-        }
-        // End the request if `end` has been called on us
-        else if (self._ended) {
-          request.end();
-        }
-      }
-    }());
-  }
-};
-
-// Processes a response from the current native request
-RedirectableRequest.prototype._processResponse = function (response) {
-  // Store the redirected response
-  var statusCode = response.statusCode;
-  if (this._options.trackRedirects) {
-    this._redirects.push({
-      url: this._currentUrl,
-      headers: response.headers,
-      statusCode: statusCode,
-    });
-  }
-
-  // RFC7231§6.4: The 3xx (Redirection) class of status code indicates
-  // that further action needs to be taken by the user agent in order to
-  // fulfill the request. If a Location header field is provided,
-  // the user agent MAY automatically redirect its request to the URI
-  // referenced by the Location field value,
-  // even if the specific status code is not understood.
-  var location = response.headers.location;
-  if (location && this._options.followRedirects !== false &&
-      statusCode >= 300 && statusCode < 400) {
-    // Abort the current request
-    this._currentRequest.removeAllListeners();
-    this._currentRequest.on("error", noop);
-    this._currentRequest.abort();
-    // Discard the remainder of the response to avoid waiting for data
-    response.destroy();
-
-    // RFC7231§6.4: A client SHOULD detect and intervene
-    // in cyclical redirections (i.e., "infinite" redirection loops).
-    if (++this._redirectCount > this._options.maxRedirects) {
-      this.emit("error", new TooManyRedirectsError());
-      return;
-    }
-
-    // RFC7231§6.4: Automatic redirection needs to done with
-    // care for methods not known to be safe, […]
-    // RFC7231§6.4.2–3: For historical reasons, a user agent MAY change
-    // the request method from POST to GET for the subsequent request.
-    if ((statusCode === 301 || statusCode === 302) && this._options.method === "POST" ||
-        // RFC7231§6.4.4: The 303 (See Other) status code indicates that
-        // the server is redirecting the user agent to a different resource […]
-        // A user agent can perform a retrieval request targeting that URI
-        // (a GET or HEAD request if using HTTP) […]
-        (statusCode === 303) && !/^(?:GET|HEAD)$/.test(this._options.method)) {
-      this._options.method = "GET";
-      // Drop a possible entity and headers related to it
-      this._requestBodyBuffers = [];
-      removeMatchingHeaders(/^content-/i, this._options.headers);
-    }
-
-    // Drop the Host header, as the redirect might lead to a different host
-    var previousHostName = removeMatchingHeaders(/^host$/i, this._options.headers) ||
-      url.parse(this._currentUrl).hostname;
-
-    // Create the redirected request
-    var redirectUrl = url.resolve(this._currentUrl, location);
-    debug("redirecting to", redirectUrl);
-    this._isRedirect = true;
-    var redirectUrlParts = url.parse(redirectUrl);
-    Object.assign(this._options, redirectUrlParts);
-
-    // Drop the Authorization header if redirecting to another host
-    if (redirectUrlParts.hostname !== previousHostName) {
-      removeMatchingHeaders(/^authorization$/i, this._options.headers);
-    }
-
-    // Evaluate the beforeRedirect callback
-    if (typeof this._options.beforeRedirect === "function") {
-      var responseDetails = { headers: response.headers };
-      try {
-        this._options.beforeRedirect.call(null, this._options, responseDetails);
-      }
-      catch (err) {
-        this.emit("error", err);
-        return;
-      }
-      this._sanitizeOptions(this._options);
-    }
-
-    // Perform the redirected request
-    try {
-      this._performRequest();
-    }
-    catch (cause) {
-      var error = new RedirectionError("Redirected request failed: " + cause.message);
-      error.cause = cause;
-      this.emit("error", error);
-    }
-  }
-  else {
-    // The response is not a redirect; return it as-is
-    response.responseUrl = this._currentUrl;
-    response.redirects = this._redirects;
-    this.emit("response", response);
-
-    // Clean up
-    this._requestBodyBuffers = [];
-  }
-};
-
-// Wraps the key/value object of protocols with redirect functionality
-function wrap(protocols) {
-  // Default settings
-  var exports = {
-    maxRedirects: 21,
-    maxBodyLength: 10 * 1024 * 1024,
-  };
-
-  // Wrap each protocol
-  var nativeProtocols = {};
-  Object.keys(protocols).forEach(function (scheme) {
-    var protocol = scheme + ":";
-    var nativeProtocol = nativeProtocols[protocol] = protocols[scheme];
-    var wrappedProtocol = exports[scheme] = Object.create(nativeProtocol);
-
-    // Executes a request, following redirects
-    function request(input, options, callback) {
-      // Parse parameters
-      if (typeof input === "string") {
-        var urlStr = input;
-        try {
-          input = urlToOptions(new URL(urlStr));
-        }
-        catch (err) {
-          /* istanbul ignore next */
-          input = url.parse(urlStr);
-        }
-      }
-      else if (URL && (input instanceof URL)) {
-        input = urlToOptions(input);
-      }
-      else {
-        callback = options;
-        options = input;
-        input = { protocol: protocol };
-      }
-      if (typeof options === "function") {
-        callback = options;
-        options = null;
-      }
-
-      // Set defaults
-      options = Object.assign({
-        maxRedirects: exports.maxRedirects,
-        maxBodyLength: exports.maxBodyLength,
-      }, input, options);
-      options.nativeProtocols = nativeProtocols;
-
-      assert.equal(options.protocol, protocol, "protocol mismatch");
-      debug("options", options);
-      return new RedirectableRequest(options, callback);
-    }
-
-    // Executes a GET request, following redirects
-    function get(input, options, callback) {
-      var wrappedRequest = wrappedProtocol.request(input, options, callback);
-      wrappedRequest.end();
-      return wrappedRequest;
-    }
-
-    // Expose the properties on the wrapped protocol
-    Object.defineProperties(wrappedProtocol, {
-      request: { value: request, configurable: true, enumerable: true, writable: true },
-      get: { value: get, configurable: true, enumerable: true, writable: true },
-    });
-  });
-  return exports;
-}
-
-/* istanbul ignore next */
-function noop() { /* empty */ }
-
-// from https://github.com/nodejs/node/blob/master/lib/internal/url.js
-function urlToOptions(urlObject) {
-  var options = {
-    protocol: urlObject.protocol,
-    hostname: urlObject.hostname.startsWith("[") ?
-      /* istanbul ignore next */
-      urlObject.hostname.slice(1, -1) :
-      urlObject.hostname,
-    hash: urlObject.hash,
-    search: urlObject.search,
-    pathname: urlObject.pathname,
-    path: urlObject.pathname + urlObject.search,
-    href: urlObject.href,
-  };
-  if (urlObject.port !== "") {
-    options.port = Number(urlObject.port);
-  }
-  return options;
-}
-
-function removeMatchingHeaders(regex, headers) {
-  var lastValue;
-  for (var header in headers) {
-    if (regex.test(header)) {
-      lastValue = headers[header];
-      delete headers[header];
-    }
-  }
-  return lastValue;
-}
-
-function createErrorType(code, defaultMessage) {
-  function CustomError(message) {
-    Error.captureStackTrace(this, this.constructor);
-    this.message = message || defaultMessage;
-  }
-  CustomError.prototype = new Error();
-  CustomError.prototype.constructor = CustomError;
-  CustomError.prototype.name = "Error [" + code + "]";
-  CustomError.prototype.code = code;
-  return CustomError;
-}
-
-// Exports
-module.exports = wrap({ http: http, https: https });
-module.exports.wrap = wrap;
-
-
-/***/ }),
-/* 506 */,
-/* 507 */,
-/* 508 */,
-/* 509 */,
-/* 510 */,
-/* 511 */,
-/* 512 */,
-/* 513 */,
-/* 514 */,
-/* 515 */,
-/* 516 */,
-/* 517 */,
-/* 518 */,
-/* 519 */,
-/* 520 */,
-/* 521 */,
-/* 522 */
+/***/ 522:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -24460,8 +17918,8 @@ module.exports = {
 
 
 /***/ }),
-/* 523 */,
-/* 524 */
+
+/***/ 524:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -24533,106 +17991,8 @@ module.exports = move
 
 
 /***/ }),
-/* 525 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-module.exports = require(__webpack_require__.ab + "build/Release/sharp.node")
-
-/***/ }),
-/* 526 */,
-/* 527 */,
-/* 528 */,
-/* 529 */,
-/* 530 */,
-/* 531 */,
-/* 532 */,
-/* 533 */,
-/* 534 */,
-/* 535 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var conversions = __webpack_require__(29);
-var route = __webpack_require__(639);
-
-var convert = {};
-
-var models = Object.keys(conversions);
-
-function wrapRaw(fn) {
-	var wrappedFn = function (args) {
-		if (args === undefined || args === null) {
-			return args;
-		}
-
-		if (arguments.length > 1) {
-			args = Array.prototype.slice.call(arguments);
-		}
-
-		return fn(args);
-	};
-
-	// preserve .conversion property if there is one
-	if ('conversion' in fn) {
-		wrappedFn.conversion = fn.conversion;
-	}
-
-	return wrappedFn;
-}
-
-function wrapRounded(fn) {
-	var wrappedFn = function (args) {
-		if (args === undefined || args === null) {
-			return args;
-		}
-
-		if (arguments.length > 1) {
-			args = Array.prototype.slice.call(arguments);
-		}
-
-		var result = fn(args);
-
-		// we're assuming the result is an array here.
-		// see notice in conversions.js; don't use box types
-		// in conversion functions.
-		if (typeof result === 'object') {
-			for (var len = result.length, i = 0; i < len; i++) {
-				result[i] = Math.round(result[i]);
-			}
-		}
-
-		return result;
-	};
-
-	// preserve .conversion property if there is one
-	if ('conversion' in fn) {
-		wrappedFn.conversion = fn.conversion;
-	}
-
-	return wrappedFn;
-}
-
-models.forEach(function (fromModel) {
-	convert[fromModel] = {};
-
-	Object.defineProperty(convert[fromModel], 'channels', {value: conversions[fromModel].channels});
-	Object.defineProperty(convert[fromModel], 'labels', {value: conversions[fromModel].labels});
-
-	var routes = route(fromModel);
-	var routeModels = Object.keys(routes);
-
-	routeModels.forEach(function (toModel) {
-		var fn = routes[toModel];
-
-		convert[fromModel][toModel] = wrapRounded(fn);
-		convert[fromModel][toModel].raw = wrapRaw(fn);
-	});
-});
-
-module.exports = convert;
-
-
-/***/ }),
-/* 536 */
+/***/ 536:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -24734,7 +18094,8 @@ module.exports = Axios;
 
 
 /***/ }),
-/* 537 */
+
+/***/ 537:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -24747,8 +18108,8 @@ module.exports = {
 
 
 /***/ }),
-/* 538 */,
-/* 539 */
+
+/***/ 539:
 /***/ (function(module) {
 
 "use strict";
@@ -24813,46 +18174,54 @@ module.exports = GZheader;
 
 
 /***/ }),
-/* 540 */,
-/* 541 */,
-/* 542 */,
-/* 543 */,
-/* 544 */,
-/* 545 */,
-/* 546 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const parse = __webpack_require__(621)
-const eq = __webpack_require__(12)
+/***/ 546:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-const diff = (version1, version2) => {
-  if (eq(version1, version2)) {
-    return null
-  } else {
-    const v1 = parse(version1)
-    const v2 = parse(version2)
-    const hasPre = v1.prerelease.length || v2.prerelease.length
-    const prefix = hasPre ? 'pre' : ''
-    const defaultResult = hasPre ? 'prerelease' : ''
-    for (const key in v1) {
-      if (key === 'major' || key === 'minor' || key === 'patch') {
-        if (v1[key] !== v2[key]) {
-          return prefix + key
-        }
-      }
-    }
-    return defaultResult // may be undefined
-  }
+"use strict";
+
+
+exports.base64 = true;
+exports.array = true;
+exports.string = true;
+exports.arraybuffer = typeof ArrayBuffer !== "undefined" && typeof Uint8Array !== "undefined";
+exports.nodebuffer = typeof Buffer !== "undefined";
+// contains true if JSZip can read/generate Uint8Array, false otherwise.
+exports.uint8array = typeof Uint8Array !== "undefined";
+
+if (typeof ArrayBuffer === "undefined") {
+    exports.blob = false;
 }
-module.exports = diff
+else {
+    var buffer = new ArrayBuffer(0);
+    try {
+        exports.blob = new Blob([buffer], {
+            type: "application/zip"
+        }).size === 0;
+    }
+    catch (e) {
+        try {
+            var Builder = self.BlobBuilder || self.WebKitBlobBuilder || self.MozBlobBuilder || self.MSBlobBuilder;
+            var builder = new Builder();
+            builder.append(buffer);
+            exports.blob = builder.getBlob('application/zip').size === 0;
+        }
+        catch (e) {
+            exports.blob = false;
+        }
+    }
+}
+
+try {
+    exports.nodestream = !!__webpack_require__(559).Readable;
+} catch(e) {
+    exports.nodestream = false;
+}
 
 
 /***/ }),
-/* 547 */,
-/* 548 */,
-/* 549 */,
-/* 550 */,
-/* 551 */
+
+/***/ 551:
 /***/ (function(module) {
 
 module.exports = r => {
@@ -24863,8 +18232,8 @@ module.exports = r => {
 
 
 /***/ }),
-/* 552 */,
-/* 553 */
+
+/***/ 553:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -24941,9 +18310,8 @@ module.exports = function buildURL(url, params, paramsSerializer) {
 
 
 /***/ }),
-/* 554 */,
-/* 555 */,
-/* 556 */
+
+/***/ 556:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -24952,7 +18320,7 @@ module.exports = function buildURL(url, params, paramsSerializer) {
 
 var zlib_deflate = __webpack_require__(573);
 var utils        = __webpack_require__(33);
-var strings      = __webpack_require__(159);
+var strings      = __webpack_require__(852);
 var msg          = __webpack_require__(294);
 var ZStream      = __webpack_require__(665);
 
@@ -25350,9 +18718,8 @@ exports.gzip = gzip;
 
 
 /***/ }),
-/* 557 */,
-/* 558 */,
-/* 559 */
+
+/***/ 559:
 /***/ (function(module, exports, __webpack_require__) {
 
 var Stream = __webpack_require__(413);
@@ -25366,7 +18733,7 @@ if (process.env.READABLE_STREAM === 'disable' && Stream) {
   exports.PassThrough = Stream.PassThrough;
   exports.Stream = Stream;
 } else {
-  exports = module.exports = __webpack_require__(934);
+  exports = module.exports = __webpack_require__(188);
   exports.Stream = Stream || exports;
   exports.Readable = exports;
   exports.Writable = __webpack_require__(708);
@@ -25377,12 +18744,8 @@ if (process.env.READABLE_STREAM === 'disable' && Stream) {
 
 
 /***/ }),
-/* 560 */,
-/* 561 */,
-/* 562 */,
-/* 563 */,
-/* 564 */,
-/* 565 */
+
+/***/ 565:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -25412,7 +18775,8 @@ module.exports = {
 
 
 /***/ }),
-/* 566 */
+
+/***/ 566:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -25437,29 +18801,8 @@ module.exports = function createError(message, config, code, request, response) 
 
 
 /***/ }),
-/* 567 */,
-/* 568 */,
-/* 569 */,
-/* 570 */,
-/* 571 */,
-/* 572 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const Range = __webpack_require__(174)
-const validRange = (range, options) => {
-  try {
-    // Return '*' instead of '' so that truthiness works.
-    // This will throw if it's invalid anyway
-    return new Range(range, options).range || '*'
-  } catch (er) {
-    return null
-  }
-}
-module.exports = validRange
-
-
-/***/ }),
-/* 573 */
+/***/ 573:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -25485,9 +18828,9 @@ module.exports = validRange
 // 3. This notice may not be removed or altered from any source distribution.
 
 var utils   = __webpack_require__(33);
-var trees   = __webpack_require__(483);
+var trees   = __webpack_require__(786);
 var adler32 = __webpack_require__(742);
-var crc32   = __webpack_require__(46);
+var crc32   = __webpack_require__(630);
 var msg     = __webpack_require__(294);
 
 /* Public constants ==========================================================*/
@@ -27340,8 +20683,8 @@ exports.deflateTune = deflateTune;
 
 
 /***/ }),
-/* 574 */,
-/* 575 */
+
+/***/ 575:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -27360,7 +20703,8 @@ module.exports = function normalizeHeaderName(headers, normalizedName) {
 
 
 /***/ }),
-/* 576 */
+
+/***/ 576:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -27440,7 +20784,8 @@ module.exports = {
 };
 
 /***/ }),
-/* 577 */
+
+/***/ 577:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 // Copyright Joyent, Inc. and other Node contributors.
@@ -27749,10 +21094,8 @@ exports.realpath = function realpath(p, cache, cb) {
 
 
 /***/ }),
-/* 578 */,
-/* 579 */,
-/* 580 */,
-/* 581 */
+
+/***/ 581:
 /***/ (function(module) {
 
 if (typeof Object.create === 'function') {
@@ -27785,16 +21128,8 @@ if (typeof Object.create === 'function') {
 
 
 /***/ }),
-/* 582 */,
-/* 583 */,
-/* 584 */,
-/* 585 */,
-/* 586 */,
-/* 587 */,
-/* 588 */,
-/* 589 */,
-/* 590 */,
-/* 591 */
+
+/***/ 591:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -27830,12 +21165,8 @@ module.exports = DataLengthProbe;
 
 
 /***/ }),
-/* 592 */,
-/* 593 */,
-/* 594 */,
-/* 595 */,
-/* 596 */,
-/* 597 */
+
+/***/ 597:
 /***/ (function(module) {
 
 "use strict";
@@ -27849,7 +21180,8 @@ module.exports = typeof setImmediate === 'function' ? setImmediate :
 
 
 /***/ }),
-/* 598 */
+
+/***/ 598:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -28022,8 +21354,8 @@ module.exports = copySync
 
 
 /***/ }),
-/* 599 */,
-/* 600 */
+
+/***/ 600:
 /***/ (function(module) {
 
 "use strict";
@@ -28050,8 +21382,8 @@ module.exports.win32 = win32;
 
 
 /***/ }),
-/* 601 */,
-/* 602 */
+
+/***/ 602:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var concatMap = __webpack_require__(198);
@@ -28258,15 +21590,15 @@ function expand(str, isTop) {
 
 
 /***/ }),
-/* 603 */,
-/* 604 */,
-/* 605 */
+
+/***/ 605:
 /***/ (function(module) {
 
 module.exports = require("http");
 
 /***/ }),
-/* 606 */
+
+/***/ 606:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -28309,7 +21641,7 @@ function JSZip() {
 }
 JSZip.prototype = __webpack_require__(264);
 JSZip.prototype.loadAsync = __webpack_require__(817);
-JSZip.support = __webpack_require__(188);
+JSZip.support = __webpack_require__(546);
 JSZip.defaults = __webpack_require__(825);
 
 // TODO find a better way to handle this version,
@@ -28325,8 +21657,8 @@ module.exports = JSZip;
 
 
 /***/ }),
-/* 607 */,
-/* 608 */
+
+/***/ 608:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 module.exports = realpath
@@ -28398,224 +21730,8 @@ function unmonkeypatch () {
 
 
 /***/ }),
-/* 609 */
-/***/ (function(module, exports, __webpack_require__) {
 
-const { MAX_SAFE_COMPONENT_LENGTH } = __webpack_require__(248)
-const debug = __webpack_require__(39)
-exports = module.exports = {}
-
-// The actual regexps go on exports.re
-const re = exports.re = []
-const src = exports.src = []
-const t = exports.t = {}
-let R = 0
-
-const createToken = (name, value, isGlobal) => {
-  const index = R++
-  debug(index, value)
-  t[name] = index
-  src[index] = value
-  re[index] = new RegExp(value, isGlobal ? 'g' : undefined)
-}
-
-// The following Regular Expressions can be used for tokenizing,
-// validating, and parsing SemVer version strings.
-
-// ## Numeric Identifier
-// A single `0`, or a non-zero digit followed by zero or more digits.
-
-createToken('NUMERICIDENTIFIER', '0|[1-9]\\d*')
-createToken('NUMERICIDENTIFIERLOOSE', '[0-9]+')
-
-// ## Non-numeric Identifier
-// Zero or more digits, followed by a letter or hyphen, and then zero or
-// more letters, digits, or hyphens.
-
-createToken('NONNUMERICIDENTIFIER', '\\d*[a-zA-Z-][a-zA-Z0-9-]*')
-
-// ## Main Version
-// Three dot-separated numeric identifiers.
-
-createToken('MAINVERSION', `(${src[t.NUMERICIDENTIFIER]})\\.` +
-                   `(${src[t.NUMERICIDENTIFIER]})\\.` +
-                   `(${src[t.NUMERICIDENTIFIER]})`)
-
-createToken('MAINVERSIONLOOSE', `(${src[t.NUMERICIDENTIFIERLOOSE]})\\.` +
-                        `(${src[t.NUMERICIDENTIFIERLOOSE]})\\.` +
-                        `(${src[t.NUMERICIDENTIFIERLOOSE]})`)
-
-// ## Pre-release Version Identifier
-// A numeric identifier, or a non-numeric identifier.
-
-createToken('PRERELEASEIDENTIFIER', `(?:${src[t.NUMERICIDENTIFIER]
-}|${src[t.NONNUMERICIDENTIFIER]})`)
-
-createToken('PRERELEASEIDENTIFIERLOOSE', `(?:${src[t.NUMERICIDENTIFIERLOOSE]
-}|${src[t.NONNUMERICIDENTIFIER]})`)
-
-// ## Pre-release Version
-// Hyphen, followed by one or more dot-separated pre-release version
-// identifiers.
-
-createToken('PRERELEASE', `(?:-(${src[t.PRERELEASEIDENTIFIER]
-}(?:\\.${src[t.PRERELEASEIDENTIFIER]})*))`)
-
-createToken('PRERELEASELOOSE', `(?:-?(${src[t.PRERELEASEIDENTIFIERLOOSE]
-}(?:\\.${src[t.PRERELEASEIDENTIFIERLOOSE]})*))`)
-
-// ## Build Metadata Identifier
-// Any combination of digits, letters, or hyphens.
-
-createToken('BUILDIDENTIFIER', '[0-9A-Za-z-]+')
-
-// ## Build Metadata
-// Plus sign, followed by one or more period-separated build metadata
-// identifiers.
-
-createToken('BUILD', `(?:\\+(${src[t.BUILDIDENTIFIER]
-}(?:\\.${src[t.BUILDIDENTIFIER]})*))`)
-
-// ## Full Version String
-// A main version, followed optionally by a pre-release version and
-// build metadata.
-
-// Note that the only major, minor, patch, and pre-release sections of
-// the version string are capturing groups.  The build metadata is not a
-// capturing group, because it should not ever be used in version
-// comparison.
-
-createToken('FULLPLAIN', `v?${src[t.MAINVERSION]
-}${src[t.PRERELEASE]}?${
-  src[t.BUILD]}?`)
-
-createToken('FULL', `^${src[t.FULLPLAIN]}$`)
-
-// like full, but allows v1.2.3 and =1.2.3, which people do sometimes.
-// also, 1.0.0alpha1 (prerelease without the hyphen) which is pretty
-// common in the npm registry.
-createToken('LOOSEPLAIN', `[v=\\s]*${src[t.MAINVERSIONLOOSE]
-}${src[t.PRERELEASELOOSE]}?${
-  src[t.BUILD]}?`)
-
-createToken('LOOSE', `^${src[t.LOOSEPLAIN]}$`)
-
-createToken('GTLT', '((?:<|>)?=?)')
-
-// Something like "2.*" or "1.2.x".
-// Note that "x.x" is a valid xRange identifer, meaning "any version"
-// Only the first item is strictly required.
-createToken('XRANGEIDENTIFIERLOOSE', `${src[t.NUMERICIDENTIFIERLOOSE]}|x|X|\\*`)
-createToken('XRANGEIDENTIFIER', `${src[t.NUMERICIDENTIFIER]}|x|X|\\*`)
-
-createToken('XRANGEPLAIN', `[v=\\s]*(${src[t.XRANGEIDENTIFIER]})` +
-                   `(?:\\.(${src[t.XRANGEIDENTIFIER]})` +
-                   `(?:\\.(${src[t.XRANGEIDENTIFIER]})` +
-                   `(?:${src[t.PRERELEASE]})?${
-                     src[t.BUILD]}?` +
-                   `)?)?`)
-
-createToken('XRANGEPLAINLOOSE', `[v=\\s]*(${src[t.XRANGEIDENTIFIERLOOSE]})` +
-                        `(?:\\.(${src[t.XRANGEIDENTIFIERLOOSE]})` +
-                        `(?:\\.(${src[t.XRANGEIDENTIFIERLOOSE]})` +
-                        `(?:${src[t.PRERELEASELOOSE]})?${
-                          src[t.BUILD]}?` +
-                        `)?)?`)
-
-createToken('XRANGE', `^${src[t.GTLT]}\\s*${src[t.XRANGEPLAIN]}$`)
-createToken('XRANGELOOSE', `^${src[t.GTLT]}\\s*${src[t.XRANGEPLAINLOOSE]}$`)
-
-// Coercion.
-// Extract anything that could conceivably be a part of a valid semver
-createToken('COERCE', `${'(^|[^\\d])' +
-              '(\\d{1,'}${MAX_SAFE_COMPONENT_LENGTH}})` +
-              `(?:\\.(\\d{1,${MAX_SAFE_COMPONENT_LENGTH}}))?` +
-              `(?:\\.(\\d{1,${MAX_SAFE_COMPONENT_LENGTH}}))?` +
-              `(?:$|[^\\d])`)
-createToken('COERCERTL', src[t.COERCE], true)
-
-// Tilde ranges.
-// Meaning is "reasonably at or greater than"
-createToken('LONETILDE', '(?:~>?)')
-
-createToken('TILDETRIM', `(\\s*)${src[t.LONETILDE]}\\s+`, true)
-exports.tildeTrimReplace = '$1~'
-
-createToken('TILDE', `^${src[t.LONETILDE]}${src[t.XRANGEPLAIN]}$`)
-createToken('TILDELOOSE', `^${src[t.LONETILDE]}${src[t.XRANGEPLAINLOOSE]}$`)
-
-// Caret ranges.
-// Meaning is "at least and backwards compatible with"
-createToken('LONECARET', '(?:\\^)')
-
-createToken('CARETTRIM', `(\\s*)${src[t.LONECARET]}\\s+`, true)
-exports.caretTrimReplace = '$1^'
-
-createToken('CARET', `^${src[t.LONECARET]}${src[t.XRANGEPLAIN]}$`)
-createToken('CARETLOOSE', `^${src[t.LONECARET]}${src[t.XRANGEPLAINLOOSE]}$`)
-
-// A simple gt/lt/eq thing, or just "" to indicate "any version"
-createToken('COMPARATORLOOSE', `^${src[t.GTLT]}\\s*(${src[t.LOOSEPLAIN]})$|^$`)
-createToken('COMPARATOR', `^${src[t.GTLT]}\\s*(${src[t.FULLPLAIN]})$|^$`)
-
-// An expression to strip any whitespace between the gtlt and the thing
-// it modifies, so that `> 1.2.3` ==> `>1.2.3`
-createToken('COMPARATORTRIM', `(\\s*)${src[t.GTLT]
-}\\s*(${src[t.LOOSEPLAIN]}|${src[t.XRANGEPLAIN]})`, true)
-exports.comparatorTrimReplace = '$1$2$3'
-
-// Something like `1.2.3 - 1.2.4`
-// Note that these all use the loose form, because they'll be
-// checked against either the strict or loose comparator form
-// later.
-createToken('HYPHENRANGE', `^\\s*(${src[t.XRANGEPLAIN]})` +
-                   `\\s+-\\s+` +
-                   `(${src[t.XRANGEPLAIN]})` +
-                   `\\s*$`)
-
-createToken('HYPHENRANGELOOSE', `^\\s*(${src[t.XRANGEPLAINLOOSE]})` +
-                        `\\s+-\\s+` +
-                        `(${src[t.XRANGEPLAINLOOSE]})` +
-                        `\\s*$`)
-
-// Star ranges basically just allow anything at all.
-createToken('STAR', '(<|>)?=?\\s*\\*')
-// >=0.0.0 is like a star
-createToken('GTE0', '^\\s*>=\\s*0\.0\.0\\s*$')
-createToken('GTE0PRE', '^\\s*>=\\s*0\.0\.0-0\\s*$')
-
-
-/***/ }),
-/* 610 */
-/***/ (function(module) {
-
-const numeric = /^[0-9]+$/
-const compareIdentifiers = (a, b) => {
-  const anum = numeric.test(a)
-  const bnum = numeric.test(b)
-
-  if (anum && bnum) {
-    a = +a
-    b = +b
-  }
-
-  return a === b ? 0
-    : (anum && !bnum) ? -1
-    : (bnum && !anum) ? 1
-    : a < b ? -1
-    : 1
-}
-
-const rcompareIdentifiers = (a, b) => compareIdentifiers(b, a)
-
-module.exports = {
-  compareIdentifiers,
-  rcompareIdentifiers
-}
-
-
-/***/ }),
-/* 611 */
+/***/ 611:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -28664,7 +21780,8 @@ module.exports = NodejsStreamOutputAdapter;
 
 
 /***/ }),
-/* 612 */
+
+/***/ 612:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -28685,404 +21802,96 @@ module.exports = pako;
 
 
 /***/ }),
-/* 613 */,
-/* 614 */
+
+/***/ 614:
 /***/ (function(module) {
 
 module.exports = require("events");
 
 /***/ }),
-/* 615 */,
-/* 616 */,
-/* 617 */,
-/* 618 */,
-/* 619 */
+
+/***/ 619:
 /***/ (function(module) {
 
 module.exports = require("constants");
 
 /***/ }),
-/* 620 */,
-/* 621 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const {MAX_LENGTH} = __webpack_require__(248)
-const { re, t } = __webpack_require__(609)
-const SemVer = __webpack_require__(82)
-
-const parseOptions = __webpack_require__(849)
-const parse = (version, options) => {
-  options = parseOptions(options)
-
-  if (version instanceof SemVer) {
-    return version
-  }
-
-  if (typeof version !== 'string') {
-    return null
-  }
-
-  if (version.length > MAX_LENGTH) {
-    return null
-  }
-
-  const r = options.loose ? re[t.LOOSE] : re[t.FULL]
-  if (!r.test(version)) {
-    return null
-  }
-
-  try {
-    return new SemVer(version, options)
-  } catch (er) {
-    return null
-  }
-}
-
-module.exports = parse
-
-
-/***/ }),
-/* 622 */
+/***/ 622:
 /***/ (function(module) {
 
 module.exports = require("path");
 
 /***/ }),
-/* 623 */,
-/* 624 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const parse = __webpack_require__(621)
-const prerelease = (version, options) => {
-  const parsed = parse(version, options)
-  return (parsed && parsed.prerelease.length) ? parsed.prerelease : null
-}
-module.exports = prerelease
-
-
-/***/ }),
-/* 625 */,
-/* 626 */,
-/* 627 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-const SemVer = __webpack_require__(82)
-const major = (a, loose) => new SemVer(a, loose).major
-module.exports = major
-
-
-/***/ }),
-/* 628 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-var isArrayish = __webpack_require__(153);
-
-var concat = Array.prototype.concat;
-var slice = Array.prototype.slice;
-
-var swizzle = module.exports = function swizzle(args) {
-	var results = [];
-
-	for (var i = 0, len = args.length; i < len; i++) {
-		var arg = args[i];
-
-		if (isArrayish(arg)) {
-			// http://jsperf.com/javascript-array-concat-vs-push/98
-			results = concat.call(results, slice.call(arg));
-		} else {
-			results.push(arg);
-		}
-	}
-
-	return results;
-};
-
-swizzle.wrap = function (fn) {
-	return function () {
-		return fn(swizzle(arguments));
-	};
-};
-
-
-/***/ }),
-/* 629 */,
-/* 630 */
+/***/ 630:
 /***/ (function(module) {
 
 "use strict";
 
 
-module.exports = {
-	"aliceblue": [240, 248, 255],
-	"antiquewhite": [250, 235, 215],
-	"aqua": [0, 255, 255],
-	"aquamarine": [127, 255, 212],
-	"azure": [240, 255, 255],
-	"beige": [245, 245, 220],
-	"bisque": [255, 228, 196],
-	"black": [0, 0, 0],
-	"blanchedalmond": [255, 235, 205],
-	"blue": [0, 0, 255],
-	"blueviolet": [138, 43, 226],
-	"brown": [165, 42, 42],
-	"burlywood": [222, 184, 135],
-	"cadetblue": [95, 158, 160],
-	"chartreuse": [127, 255, 0],
-	"chocolate": [210, 105, 30],
-	"coral": [255, 127, 80],
-	"cornflowerblue": [100, 149, 237],
-	"cornsilk": [255, 248, 220],
-	"crimson": [220, 20, 60],
-	"cyan": [0, 255, 255],
-	"darkblue": [0, 0, 139],
-	"darkcyan": [0, 139, 139],
-	"darkgoldenrod": [184, 134, 11],
-	"darkgray": [169, 169, 169],
-	"darkgreen": [0, 100, 0],
-	"darkgrey": [169, 169, 169],
-	"darkkhaki": [189, 183, 107],
-	"darkmagenta": [139, 0, 139],
-	"darkolivegreen": [85, 107, 47],
-	"darkorange": [255, 140, 0],
-	"darkorchid": [153, 50, 204],
-	"darkred": [139, 0, 0],
-	"darksalmon": [233, 150, 122],
-	"darkseagreen": [143, 188, 143],
-	"darkslateblue": [72, 61, 139],
-	"darkslategray": [47, 79, 79],
-	"darkslategrey": [47, 79, 79],
-	"darkturquoise": [0, 206, 209],
-	"darkviolet": [148, 0, 211],
-	"deeppink": [255, 20, 147],
-	"deepskyblue": [0, 191, 255],
-	"dimgray": [105, 105, 105],
-	"dimgrey": [105, 105, 105],
-	"dodgerblue": [30, 144, 255],
-	"firebrick": [178, 34, 34],
-	"floralwhite": [255, 250, 240],
-	"forestgreen": [34, 139, 34],
-	"fuchsia": [255, 0, 255],
-	"gainsboro": [220, 220, 220],
-	"ghostwhite": [248, 248, 255],
-	"gold": [255, 215, 0],
-	"goldenrod": [218, 165, 32],
-	"gray": [128, 128, 128],
-	"green": [0, 128, 0],
-	"greenyellow": [173, 255, 47],
-	"grey": [128, 128, 128],
-	"honeydew": [240, 255, 240],
-	"hotpink": [255, 105, 180],
-	"indianred": [205, 92, 92],
-	"indigo": [75, 0, 130],
-	"ivory": [255, 255, 240],
-	"khaki": [240, 230, 140],
-	"lavender": [230, 230, 250],
-	"lavenderblush": [255, 240, 245],
-	"lawngreen": [124, 252, 0],
-	"lemonchiffon": [255, 250, 205],
-	"lightblue": [173, 216, 230],
-	"lightcoral": [240, 128, 128],
-	"lightcyan": [224, 255, 255],
-	"lightgoldenrodyellow": [250, 250, 210],
-	"lightgray": [211, 211, 211],
-	"lightgreen": [144, 238, 144],
-	"lightgrey": [211, 211, 211],
-	"lightpink": [255, 182, 193],
-	"lightsalmon": [255, 160, 122],
-	"lightseagreen": [32, 178, 170],
-	"lightskyblue": [135, 206, 250],
-	"lightslategray": [119, 136, 153],
-	"lightslategrey": [119, 136, 153],
-	"lightsteelblue": [176, 196, 222],
-	"lightyellow": [255, 255, 224],
-	"lime": [0, 255, 0],
-	"limegreen": [50, 205, 50],
-	"linen": [250, 240, 230],
-	"magenta": [255, 0, 255],
-	"maroon": [128, 0, 0],
-	"mediumaquamarine": [102, 205, 170],
-	"mediumblue": [0, 0, 205],
-	"mediumorchid": [186, 85, 211],
-	"mediumpurple": [147, 112, 219],
-	"mediumseagreen": [60, 179, 113],
-	"mediumslateblue": [123, 104, 238],
-	"mediumspringgreen": [0, 250, 154],
-	"mediumturquoise": [72, 209, 204],
-	"mediumvioletred": [199, 21, 133],
-	"midnightblue": [25, 25, 112],
-	"mintcream": [245, 255, 250],
-	"mistyrose": [255, 228, 225],
-	"moccasin": [255, 228, 181],
-	"navajowhite": [255, 222, 173],
-	"navy": [0, 0, 128],
-	"oldlace": [253, 245, 230],
-	"olive": [128, 128, 0],
-	"olivedrab": [107, 142, 35],
-	"orange": [255, 165, 0],
-	"orangered": [255, 69, 0],
-	"orchid": [218, 112, 214],
-	"palegoldenrod": [238, 232, 170],
-	"palegreen": [152, 251, 152],
-	"paleturquoise": [175, 238, 238],
-	"palevioletred": [219, 112, 147],
-	"papayawhip": [255, 239, 213],
-	"peachpuff": [255, 218, 185],
-	"peru": [205, 133, 63],
-	"pink": [255, 192, 203],
-	"plum": [221, 160, 221],
-	"powderblue": [176, 224, 230],
-	"purple": [128, 0, 128],
-	"rebeccapurple": [102, 51, 153],
-	"red": [255, 0, 0],
-	"rosybrown": [188, 143, 143],
-	"royalblue": [65, 105, 225],
-	"saddlebrown": [139, 69, 19],
-	"salmon": [250, 128, 114],
-	"sandybrown": [244, 164, 96],
-	"seagreen": [46, 139, 87],
-	"seashell": [255, 245, 238],
-	"sienna": [160, 82, 45],
-	"silver": [192, 192, 192],
-	"skyblue": [135, 206, 235],
-	"slateblue": [106, 90, 205],
-	"slategray": [112, 128, 144],
-	"slategrey": [112, 128, 144],
-	"snow": [255, 250, 250],
-	"springgreen": [0, 255, 127],
-	"steelblue": [70, 130, 180],
-	"tan": [210, 180, 140],
-	"teal": [0, 128, 128],
-	"thistle": [216, 191, 216],
-	"tomato": [255, 99, 71],
-	"turquoise": [64, 224, 208],
-	"violet": [238, 130, 238],
-	"wheat": [245, 222, 179],
-	"white": [255, 255, 255],
-	"whitesmoke": [245, 245, 245],
-	"yellow": [255, 255, 0],
-	"yellowgreen": [154, 205, 50]
-};
+// Note: we can't get significant speed boost here.
+// So write code to minimize size - no pregenerated tables
+// and array tools dependencies.
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+// Use ordinary array, since untyped makes no boost here
+function makeTable() {
+  var c, table = [];
+
+  for (var n = 0; n < 256; n++) {
+    c = n;
+    for (var k = 0; k < 8; k++) {
+      c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+    }
+    table[n] = c;
+  }
+
+  return table;
+}
+
+// Create table on load. Just 255 signed longs. Not a problem.
+var crcTable = makeTable();
+
+
+function crc32(crc, buf, len, pos) {
+  var t = crcTable,
+      end = pos + len;
+
+  crc ^= -1;
+
+  for (var i = pos; i < end; i++) {
+    crc = (crc >>> 8) ^ t[(crc ^ buf[i]) & 0xFF];
+  }
+
+  return (crc ^ (-1)); // >>> 0;
+}
+
+
+module.exports = crc32;
 
 
 /***/ }),
-/* 631 */,
-/* 632 */,
-/* 633 */,
-/* 634 */,
-/* 635 */,
-/* 636 */,
-/* 637 */,
-/* 638 */,
-/* 639 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-var conversions = __webpack_require__(29);
-
-/*
-	this function routes a model to all other models.
-
-	all functions that are routed have a property `.conversion` attached
-	to the returned synthetic function. This property is an array
-	of strings, each with the steps in between the 'from' and 'to'
-	color models (inclusive).
-
-	conversions that are not possible simply are not included.
-*/
-
-function buildGraph() {
-	var graph = {};
-	// https://jsperf.com/object-keys-vs-for-in-with-closure/3
-	var models = Object.keys(conversions);
-
-	for (var len = models.length, i = 0; i < len; i++) {
-		graph[models[i]] = {
-			// http://jsperf.com/1-vs-infinity
-			// micro-opt, but this is simple.
-			distance: -1,
-			parent: null
-		};
-	}
-
-	return graph;
-}
-
-// https://en.wikipedia.org/wiki/Breadth-first_search
-function deriveBFS(fromModel) {
-	var graph = buildGraph();
-	var queue = [fromModel]; // unshift -> queue -> pop
-
-	graph[fromModel].distance = 0;
-
-	while (queue.length) {
-		var current = queue.pop();
-		var adjacents = Object.keys(conversions[current]);
-
-		for (var len = adjacents.length, i = 0; i < len; i++) {
-			var adjacent = adjacents[i];
-			var node = graph[adjacent];
-
-			if (node.distance === -1) {
-				node.distance = graph[current].distance + 1;
-				node.parent = current;
-				queue.unshift(adjacent);
-			}
-		}
-	}
-
-	return graph;
-}
-
-function link(from, to) {
-	return function (args) {
-		return to(from(args));
-	};
-}
-
-function wrapConversion(toModel, graph) {
-	var path = [graph[toModel].parent, toModel];
-	var fn = conversions[graph[toModel].parent][toModel];
-
-	var cur = graph[toModel].parent;
-	while (graph[cur].parent) {
-		path.unshift(graph[cur].parent);
-		fn = link(conversions[graph[cur].parent][cur], fn);
-		cur = graph[cur].parent;
-	}
-
-	fn.conversion = path;
-	return fn;
-}
-
-module.exports = function (fromModel) {
-	var graph = deriveBFS(fromModel);
-	var conversion = {};
-
-	var models = Object.keys(graph);
-	for (var len = models.length, i = 0; i < len; i++) {
-		var toModel = models[i];
-		var node = graph[toModel];
-
-		if (node.parent === null) {
-			// no possible conversion, or this node is the source model.
-			continue;
-		}
-
-		conversion[toModel] = wrapConversion(toModel, graph);
-	}
-
-	return conversion;
-};
-
-
-
-/***/ }),
-/* 640 */,
-/* 641 */,
-/* 642 */,
-/* 643 */
+/***/ 643:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -29387,9 +22196,8 @@ function race(iterable) {
 
 
 /***/ }),
-/* 644 */,
-/* 645 */,
-/* 646 */
+
+/***/ 646:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var wrappy = __webpack_require__(818)
@@ -29437,26 +22245,8 @@ function onceStrict (fn) {
 
 
 /***/ }),
-/* 647 */,
-/* 648 */,
-/* 649 */,
-/* 650 */,
-/* 651 */,
-/* 652 */,
-/* 653 */,
-/* 654 */,
-/* 655 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const compareBuild = __webpack_require__(185)
-const rsort = (list, loose) => list.sort((a, b) => compareBuild(b, a, loose))
-module.exports = rsort
-
-
-/***/ }),
-/* 656 */,
-/* 657 */,
-/* 658 */
+/***/ 658:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -29511,195 +22301,8 @@ module.exports = {
 
 
 /***/ }),
-/* 659 */,
-/* 660 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-
-const is = __webpack_require__(64);
-
-/**
- * Blend modes.
- * @member
- * @private
- */
-const blend = {
-  clear: 'clear',
-  source: 'source',
-  over: 'over',
-  in: 'in',
-  out: 'out',
-  atop: 'atop',
-  dest: 'dest',
-  'dest-over': 'dest-over',
-  'dest-in': 'dest-in',
-  'dest-out': 'dest-out',
-  'dest-atop': 'dest-atop',
-  xor: 'xor',
-  add: 'add',
-  saturate: 'saturate',
-  multiply: 'multiply',
-  screen: 'screen',
-  overlay: 'overlay',
-  darken: 'darken',
-  lighten: 'lighten',
-  'colour-dodge': 'colour-dodge',
-  'color-dodge': 'colour-dodge',
-  'colour-burn': 'colour-burn',
-  'color-burn': 'colour-burn',
-  'hard-light': 'hard-light',
-  'soft-light': 'soft-light',
-  difference: 'difference',
-  exclusion: 'exclusion'
-};
-
-/**
- * Composite image(s) over the processed (resized, extracted etc.) image.
- *
- * The images to composite must be the same size or smaller than the processed image.
- * If both `top` and `left` options are provided, they take precedence over `gravity`.
- *
- * The `blend` option can be one of `clear`, `source`, `over`, `in`, `out`, `atop`,
- * `dest`, `dest-over`, `dest-in`, `dest-out`, `dest-atop`,
- * `xor`, `add`, `saturate`, `multiply`, `screen`, `overlay`, `darken`, `lighten`,
- * `colour-dodge`, `color-dodge`, `colour-burn`,`color-burn`,
- * `hard-light`, `soft-light`, `difference`, `exclusion`.
- *
- * More information about blend modes can be found at
- * https://libvips.github.io/libvips/API/current/libvips-conversion.html#VipsBlendMode
- * and https://www.cairographics.org/operators/
- *
- * @since 0.22.0
- *
- * @example
- * sharp('input.png')
- *   .rotate(180)
- *   .resize(300)
- *   .flatten( { background: '#ff6600' } )
- *   .composite([{ input: 'overlay.png', gravity: 'southeast' }])
- *   .sharpen()
- *   .withMetadata()
- *   .webp( { quality: 90 } )
- *   .toBuffer()
- *   .then(function(outputBuffer) {
- *     // outputBuffer contains upside down, 300px wide, alpha channel flattened
- *     // onto orange background, composited with overlay.png with SE gravity,
- *     // sharpened, with metadata, 90% quality WebP image data. Phew!
- *   });
- *
- * @param {Object[]} images - Ordered list of images to composite
- * @param {Buffer|String} [images[].input] - Buffer containing image data, String containing the path to an image file, or Create object (see below)
- * @param {Object} [images[].input.create] - describes a blank overlay to be created.
- * @param {Number} [images[].input.create.width]
- * @param {Number} [images[].input.create.height]
- * @param {Number} [images[].input.create.channels] - 3-4
- * @param {String|Object} [images[].input.create.background] - parsed by the [color](https://www.npmjs.org/package/color) module to extract values for red, green, blue and alpha.
- * @param {String} [images[].blend='over'] - how to blend this image with the image below.
- * @param {String} [images[].gravity='centre'] - gravity at which to place the overlay.
- * @param {Number} [images[].top] - the pixel offset from the top edge.
- * @param {Number} [images[].left] - the pixel offset from the left edge.
- * @param {Boolean} [images[].tile=false] - set to true to repeat the overlay image across the entire image with the given `gravity`.
- * @param {Boolean} [images[].premultiplied=false] - set to true to avoid premultipling the image below. Equivalent to the `--premultiplied` vips option.
- * @param {Number} [images[].density=72] - number representing the DPI for vector overlay image.
- * @param {Object} [images[].raw] - describes overlay when using raw pixel data.
- * @param {Number} [images[].raw.width]
- * @param {Number} [images[].raw.height]
- * @param {Number} [images[].raw.channels]
- * @returns {Sharp}
- * @throws {Error} Invalid parameters
- */
-function composite (images) {
-  if (!Array.isArray(images)) {
-    throw is.invalidParameterError('images to composite', 'array', images);
-  }
-  this.options.composite = images.map(image => {
-    if (!is.object(image)) {
-      throw is.invalidParameterError('image to composite', 'object', image);
-    }
-    const inputOptions = this._inputOptionsFromObject(image);
-    const composite = {
-      input: this._createInputDescriptor(image.input, inputOptions, { allowStream: false }),
-      blend: 'over',
-      tile: false,
-      left: 0,
-      top: 0,
-      hasOffset: false,
-      gravity: 0,
-      premultiplied: false
-    };
-    if (is.defined(image.blend)) {
-      if (is.string(blend[image.blend])) {
-        composite.blend = blend[image.blend];
-      } else {
-        throw is.invalidParameterError('blend', 'valid blend name', image.blend);
-      }
-    }
-    if (is.defined(image.tile)) {
-      if (is.bool(image.tile)) {
-        composite.tile = image.tile;
-      } else {
-        throw is.invalidParameterError('tile', 'boolean', image.tile);
-      }
-    }
-    if (is.defined(image.left)) {
-      if (is.integer(image.left)) {
-        composite.left = image.left;
-      } else {
-        throw is.invalidParameterError('left', 'integer', image.left);
-      }
-    }
-    if (is.defined(image.top)) {
-      if (is.integer(image.top)) {
-        composite.top = image.top;
-      } else {
-        throw is.invalidParameterError('top', 'integer', image.top);
-      }
-    }
-    if (is.defined(image.top) !== is.defined(image.left)) {
-      throw new Error('Expected both left and top to be set');
-    } else {
-      composite.hasOffset = is.integer(image.top) && is.integer(image.left);
-    }
-    if (is.defined(image.gravity)) {
-      if (is.integer(image.gravity) && is.inRange(image.gravity, 0, 8)) {
-        composite.gravity = image.gravity;
-      } else if (is.string(image.gravity) && is.integer(this.constructor.gravity[image.gravity])) {
-        composite.gravity = this.constructor.gravity[image.gravity];
-      } else {
-        throw is.invalidParameterError('gravity', 'valid gravity', image.gravity);
-      }
-    }
-    if (is.defined(image.premultiplied)) {
-      if (is.bool(image.premultiplied)) {
-        composite.premultiplied = image.premultiplied;
-      } else {
-        throw is.invalidParameterError('premultiplied', 'boolean', image.premultiplied);
-      }
-    }
-
-    return composite;
-  });
-  return this;
-}
-
-/**
- * Decorate the Sharp prototype with composite-related functions.
- * @private
- */
-module.exports = function (Sharp) {
-  Sharp.prototype.composite = composite;
-  Sharp.blend = blend;
-};
-
-
-/***/ }),
-/* 661 */,
-/* 662 */,
-/* 663 */,
-/* 664 */,
-/* 665 */
+/***/ 665:
 /***/ (function(module) {
 
 "use strict";
@@ -29753,462 +22356,15 @@ module.exports = ZStream;
 
 
 /***/ }),
-/* 666 */,
-/* 667 */,
-/* 668 */,
-/* 669 */
+
+/***/ 669:
 /***/ (function(module) {
 
 module.exports = require("util");
 
 /***/ }),
-/* 670 */,
-/* 671 */,
-/* 672 */,
-/* 673 */,
-/* 674 */,
-/* 675 */,
-/* 676 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-
-const color = __webpack_require__(492);
-const is = __webpack_require__(64);
-const sharp = __webpack_require__(525);
-
-/**
- * Extract input options, if any, from an object.
- * @private
- */
-function _inputOptionsFromObject (obj) {
-  const { raw, density, limitInputPixels, sequentialRead, failOnError, animated, page, pages, subifd } = obj;
-  return [raw, density, limitInputPixels, sequentialRead, failOnError, animated, page, pages, subifd].some(is.defined)
-    ? { raw, density, limitInputPixels, sequentialRead, failOnError, animated, page, pages, subifd }
-    : undefined;
-}
-
-/**
- * Create Object containing input and input-related options.
- * @private
- */
-function _createInputDescriptor (input, inputOptions, containerOptions) {
-  const inputDescriptor = {
-    failOnError: true,
-    limitInputPixels: Math.pow(0x3FFF, 2),
-    sequentialRead: false
-  };
-  if (is.string(input)) {
-    // filesystem
-    inputDescriptor.file = input;
-  } else if (is.buffer(input)) {
-    // Buffer
-    inputDescriptor.buffer = input;
-  } else if (is.uint8Array(input)) {
-    // Uint8Array or Uint8ClampedArray
-    inputDescriptor.buffer = Buffer.from(input.buffer);
-  } else if (is.plainObject(input) && !is.defined(inputOptions)) {
-    // Plain Object descriptor, e.g. create
-    inputOptions = input;
-    if (_inputOptionsFromObject(inputOptions)) {
-      // Stream with options
-      inputDescriptor.buffer = [];
-    }
-  } else if (!is.defined(input) && !is.defined(inputOptions) && is.object(containerOptions) && containerOptions.allowStream) {
-    // Stream without options
-    inputDescriptor.buffer = [];
-  } else {
-    throw new Error(`Unsupported input '${input}' of type ${typeof input}${
-      is.defined(inputOptions) ? ` when also providing options of type ${typeof inputOptions}` : ''
-    }`);
-  }
-  if (is.object(inputOptions)) {
-    // Fail on error
-    if (is.defined(inputOptions.failOnError)) {
-      if (is.bool(inputOptions.failOnError)) {
-        inputDescriptor.failOnError = inputOptions.failOnError;
-      } else {
-        throw is.invalidParameterError('failOnError', 'boolean', inputOptions.failOnError);
-      }
-    }
-    // Density
-    if (is.defined(inputOptions.density)) {
-      if (is.inRange(inputOptions.density, 1, 100000)) {
-        inputDescriptor.density = inputOptions.density;
-      } else {
-        throw is.invalidParameterError('density', 'number between 1 and 100000', inputOptions.density);
-      }
-    }
-    // limitInputPixels
-    if (is.defined(inputOptions.limitInputPixels)) {
-      if (is.bool(inputOptions.limitInputPixels)) {
-        inputDescriptor.limitInputPixels = inputOptions.limitInputPixels
-          ? Math.pow(0x3FFF, 2)
-          : 0;
-      } else if (is.integer(inputOptions.limitInputPixels) && inputOptions.limitInputPixels >= 0) {
-        inputDescriptor.limitInputPixels = inputOptions.limitInputPixels;
-      } else {
-        throw is.invalidParameterError('limitInputPixels', 'integer >= 0', inputOptions.limitInputPixels);
-      }
-    }
-    // sequentialRead
-    if (is.defined(inputOptions.sequentialRead)) {
-      if (is.bool(inputOptions.sequentialRead)) {
-        inputDescriptor.sequentialRead = inputOptions.sequentialRead;
-      } else {
-        throw is.invalidParameterError('sequentialRead', 'boolean', inputOptions.sequentialRead);
-      }
-    }
-    // Raw pixel input
-    if (is.defined(inputOptions.raw)) {
-      if (
-        is.object(inputOptions.raw) &&
-        is.integer(inputOptions.raw.width) && inputOptions.raw.width > 0 &&
-        is.integer(inputOptions.raw.height) && inputOptions.raw.height > 0 &&
-        is.integer(inputOptions.raw.channels) && is.inRange(inputOptions.raw.channels, 1, 4)
-      ) {
-        inputDescriptor.rawWidth = inputOptions.raw.width;
-        inputDescriptor.rawHeight = inputOptions.raw.height;
-        inputDescriptor.rawChannels = inputOptions.raw.channels;
-      } else {
-        throw new Error('Expected width, height and channels for raw pixel input');
-      }
-    }
-    // Multi-page input (GIF, TIFF, PDF)
-    if (is.defined(inputOptions.animated)) {
-      if (is.bool(inputOptions.animated)) {
-        inputDescriptor.pages = inputOptions.animated ? -1 : 1;
-      } else {
-        throw is.invalidParameterError('animated', 'boolean', inputOptions.animated);
-      }
-    }
-    if (is.defined(inputOptions.pages)) {
-      if (is.integer(inputOptions.pages) && is.inRange(inputOptions.pages, -1, 100000)) {
-        inputDescriptor.pages = inputOptions.pages;
-      } else {
-        throw is.invalidParameterError('pages', 'integer between -1 and 100000', inputOptions.pages);
-      }
-    }
-    if (is.defined(inputOptions.page)) {
-      if (is.integer(inputOptions.page) && is.inRange(inputOptions.page, 0, 100000)) {
-        inputDescriptor.page = inputOptions.page;
-      } else {
-        throw is.invalidParameterError('page', 'integer between 0 and 100000', inputOptions.page);
-      }
-    }
-    // Multi-level input (OpenSlide)
-    if (is.defined(inputOptions.level)) {
-      if (is.integer(inputOptions.level) && is.inRange(inputOptions.level, 0, 256)) {
-        inputDescriptor.level = inputOptions.level;
-      } else {
-        throw is.invalidParameterError('level', 'integer between 0 and 256', inputOptions.level);
-      }
-    }
-    // Sub Image File Directory (TIFF)
-    if (is.defined(inputOptions.subifd)) {
-      if (is.integer(inputOptions.subifd) && is.inRange(inputOptions.subifd, -1, 100000)) {
-        inputDescriptor.subifd = inputOptions.subifd;
-      } else {
-        throw is.invalidParameterError('subifd', 'integer between -1 and 100000', inputOptions.subifd);
-      }
-    }
-    // Create new image
-    if (is.defined(inputOptions.create)) {
-      if (
-        is.object(inputOptions.create) &&
-        is.integer(inputOptions.create.width) && inputOptions.create.width > 0 &&
-        is.integer(inputOptions.create.height) && inputOptions.create.height > 0 &&
-        is.integer(inputOptions.create.channels)
-      ) {
-        inputDescriptor.createWidth = inputOptions.create.width;
-        inputDescriptor.createHeight = inputOptions.create.height;
-        inputDescriptor.createChannels = inputOptions.create.channels;
-        // Noise
-        if (is.defined(inputOptions.create.noise)) {
-          if (!is.object(inputOptions.create.noise)) {
-            throw new Error('Expected noise to be an object');
-          }
-          if (!is.inArray(inputOptions.create.noise.type, ['gaussian'])) {
-            throw new Error('Only gaussian noise is supported at the moment');
-          }
-          if (!is.inRange(inputOptions.create.channels, 1, 4)) {
-            throw is.invalidParameterError('create.channels', 'number between 1 and 4', inputOptions.create.channels);
-          }
-          inputDescriptor.createNoiseType = inputOptions.create.noise.type;
-          if (is.number(inputOptions.create.noise.mean) && is.inRange(inputOptions.create.noise.mean, 0, 10000)) {
-            inputDescriptor.createNoiseMean = inputOptions.create.noise.mean;
-          } else {
-            throw is.invalidParameterError('create.noise.mean', 'number between 0 and 10000', inputOptions.create.noise.mean);
-          }
-          if (is.number(inputOptions.create.noise.sigma) && is.inRange(inputOptions.create.noise.sigma, 0, 10000)) {
-            inputDescriptor.createNoiseSigma = inputOptions.create.noise.sigma;
-          } else {
-            throw is.invalidParameterError('create.noise.sigma', 'number between 0 and 10000', inputOptions.create.noise.sigma);
-          }
-        } else if (is.defined(inputOptions.create.background)) {
-          if (!is.inRange(inputOptions.create.channels, 3, 4)) {
-            throw is.invalidParameterError('create.channels', 'number between 3 and 4', inputOptions.create.channels);
-          }
-          const background = color(inputOptions.create.background);
-          inputDescriptor.createBackground = [
-            background.red(),
-            background.green(),
-            background.blue(),
-            Math.round(background.alpha() * 255)
-          ];
-        } else {
-          throw new Error('Expected valid noise or background to create a new input image');
-        }
-        delete inputDescriptor.buffer;
-      } else {
-        throw new Error('Expected valid width, height and channels to create a new input image');
-      }
-    }
-  } else if (is.defined(inputOptions)) {
-    throw new Error('Invalid input options ' + inputOptions);
-  }
-  return inputDescriptor;
-}
-
-/**
- * Handle incoming Buffer chunk on Writable Stream.
- * @private
- * @param {Buffer} chunk
- * @param {string} encoding - unused
- * @param {Function} callback
- */
-function _write (chunk, encoding, callback) {
-  /* istanbul ignore else */
-  if (Array.isArray(this.options.input.buffer)) {
-    /* istanbul ignore else */
-    if (is.buffer(chunk)) {
-      if (this.options.input.buffer.length === 0) {
-        this.on('finish', () => {
-          this.streamInFinished = true;
-        });
-      }
-      this.options.input.buffer.push(chunk);
-      callback();
-    } else {
-      callback(new Error('Non-Buffer data on Writable Stream'));
-    }
-  } else {
-    callback(new Error('Unexpected data on Writable Stream'));
-  }
-}
-
-/**
- * Flattens the array of chunks accumulated in input.buffer.
- * @private
- */
-function _flattenBufferIn () {
-  if (this._isStreamInput()) {
-    this.options.input.buffer = Buffer.concat(this.options.input.buffer);
-  }
-}
-
-/**
- * Are we expecting Stream-based input?
- * @private
- * @returns {boolean}
- */
-function _isStreamInput () {
-  return Array.isArray(this.options.input.buffer);
-}
-
-/**
- * Fast access to (uncached) image metadata without decoding any compressed image data.
- * A `Promise` is returned when `callback` is not provided.
- *
- * - `format`: Name of decoder used to decompress image data e.g. `jpeg`, `png`, `webp`, `gif`, `svg`
- * - `size`: Total size of image in bytes, for Stream and Buffer input only
- * - `width`: Number of pixels wide (EXIF orientation is not taken into consideration)
- * - `height`: Number of pixels high (EXIF orientation is not taken into consideration)
- * - `space`: Name of colour space interpretation e.g. `srgb`, `rgb`, `cmyk`, `lab`, `b-w` [...](https://libvips.github.io/libvips/API/current/VipsImage.html#VipsInterpretation)
- * - `channels`: Number of bands e.g. `3` for sRGB, `4` for CMYK
- * - `depth`: Name of pixel depth format e.g. `uchar`, `char`, `ushort`, `float` [...](https://libvips.github.io/libvips/API/current/VipsImage.html#VipsBandFormat)
- * - `density`: Number of pixels per inch (DPI), if present
- * - `chromaSubsampling`: String containing JPEG chroma subsampling, `4:2:0` or `4:4:4` for RGB, `4:2:0:4` or `4:4:4:4` for CMYK
- * - `isProgressive`: Boolean indicating whether the image is interlaced using a progressive scan
- * - `pages`: Number of pages/frames contained within the image, with support for TIFF, HEIF, PDF, animated GIF and animated WebP
- * - `pageHeight`: Number of pixels high each page in a multi-page image will be.
- * - `loop`: Number of times to loop an animated image, zero refers to a continuous loop.
- * - `delay`: Delay in ms between each page in an animated image, provided as an array of integers.
- * - `pagePrimary`: Number of the primary page in a HEIF image
- * - `levels`: Details of each level in a multi-level image provided as an array of objects, requires libvips compiled with support for OpenSlide
- * - `subifds`: Number of Sub Image File Directories in an OME-TIFF image
- * - `hasProfile`: Boolean indicating the presence of an embedded ICC profile
- * - `hasAlpha`: Boolean indicating the presence of an alpha transparency channel
- * - `orientation`: Number value of the EXIF Orientation header, if present
- * - `exif`: Buffer containing raw EXIF data, if present
- * - `icc`: Buffer containing raw [ICC](https://www.npmjs.com/package/icc) profile data, if present
- * - `iptc`: Buffer containing raw IPTC data, if present
- * - `xmp`: Buffer containing raw XMP data, if present
- * - `tifftagPhotoshop`: Buffer containing raw TIFFTAG_PHOTOSHOP data, if present
- *
- * @example
- * const image = sharp(inputJpg);
- * image
- *   .metadata()
- *   .then(function(metadata) {
- *     return image
- *       .resize(Math.round(metadata.width / 2))
- *       .webp()
- *       .toBuffer();
- *   })
- *   .then(function(data) {
- *     // data contains a WebP image half the width and height of the original JPEG
- *   });
- *
- * @param {Function} [callback] - called with the arguments `(err, metadata)`
- * @returns {Promise<Object>|Sharp}
- */
-function metadata (callback) {
-  if (is.fn(callback)) {
-    if (this._isStreamInput()) {
-      this.on('finish', () => {
-        this._flattenBufferIn();
-        sharp.metadata(this.options, callback);
-      });
-    } else {
-      sharp.metadata(this.options, callback);
-    }
-    return this;
-  } else {
-    if (this._isStreamInput()) {
-      return new Promise((resolve, reject) => {
-        this.on('finish', () => {
-          this._flattenBufferIn();
-          sharp.metadata(this.options, (err, metadata) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(metadata);
-            }
-          });
-        });
-      });
-    } else {
-      return new Promise((resolve, reject) => {
-        sharp.metadata(this.options, (err, metadata) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(metadata);
-          }
-        });
-      });
-    }
-  }
-}
-
-/**
- * Access to pixel-derived image statistics for every channel in the image.
- * A `Promise` is returned when `callback` is not provided.
- *
- * - `channels`: Array of channel statistics for each channel in the image. Each channel statistic contains
- *     - `min` (minimum value in the channel)
- *     - `max` (maximum value in the channel)
- *     - `sum` (sum of all values in a channel)
- *     - `squaresSum` (sum of squared values in a channel)
- *     - `mean` (mean of the values in a channel)
- *     - `stdev` (standard deviation for the values in a channel)
- *     - `minX` (x-coordinate of one of the pixel where the minimum lies)
- *     - `minY` (y-coordinate of one of the pixel where the minimum lies)
- *     - `maxX` (x-coordinate of one of the pixel where the maximum lies)
- *     - `maxY` (y-coordinate of one of the pixel where the maximum lies)
- * - `isOpaque`: Is the image fully opaque? Will be `true` if the image has no alpha channel or if every pixel is fully opaque.
- * - `entropy`: Histogram-based estimation of greyscale entropy, discarding alpha channel if any (experimental)
- * - `sharpness`: Estimation of greyscale sharpness based on the standard deviation of a Laplacian convolution, discarding alpha channel if any (experimental)
- * - `dominant`: Object containing most dominant sRGB colour based on a 4096-bin 3D histogram (experimental)
- *
- * @example
- * const image = sharp(inputJpg);
- * image
- *   .stats()
- *   .then(function(stats) {
- *      // stats contains the channel-wise statistics array and the isOpaque value
- *   });
- *
- * @example
- * const { entropy, sharpness, dominant } = await sharp(input).stats();
- * const { r, g, b } = dominant;
- *
- * @param {Function} [callback] - called with the arguments `(err, stats)`
- * @returns {Promise<Object>}
- */
-function stats (callback) {
-  if (is.fn(callback)) {
-    if (this._isStreamInput()) {
-      this.on('finish', () => {
-        this._flattenBufferIn();
-        sharp.stats(this.options, callback);
-      });
-    } else {
-      sharp.stats(this.options, callback);
-    }
-    return this;
-  } else {
-    if (this._isStreamInput()) {
-      return new Promise((resolve, reject) => {
-        this.on('finish', function () {
-          this._flattenBufferIn();
-          sharp.stats(this.options, (err, stats) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(stats);
-            }
-          });
-        });
-      });
-    } else {
-      return new Promise((resolve, reject) => {
-        sharp.stats(this.options, (err, stats) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(stats);
-          }
-        });
-      });
-    }
-  }
-}
-
-/**
- * Decorate the Sharp prototype with input-related functions.
- * @private
- */
-module.exports = function (Sharp) {
-  Object.assign(Sharp.prototype, {
-    // Private
-    _inputOptionsFromObject,
-    _createInputDescriptor,
-    _write,
-    _flattenBufferIn,
-    _isStreamInput,
-    // Public
-    metadata,
-    stats
-  });
-};
-
-
-/***/ }),
-/* 677 */,
-/* 678 */,
-/* 679 */,
-/* 680 */,
-/* 681 */,
-/* 682 */,
-/* 683 */,
-/* 684 */,
-/* 685 */,
-/* 686 */,
-/* 687 */,
-/* 688 */
+/***/ 688:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -30284,17 +22440,8 @@ module.exports = {
 
 
 /***/ }),
-/* 689 */,
-/* 690 */,
-/* 691 */,
-/* 692 */,
-/* 693 */,
-/* 694 */,
-/* 695 */,
-/* 696 */,
-/* 697 */,
-/* 698 */,
-/* 699 */
+
+/***/ 699:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -30323,10 +22470,8 @@ module.exports = Uint8ArrayReader;
 
 
 /***/ }),
-/* 700 */,
-/* 701 */,
-/* 702 */,
-/* 703 */
+
+/***/ 703:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -30347,17 +22492,16 @@ exports.DEFLATE = __webpack_require__(221);
 
 
 /***/ }),
-/* 704 */
+
+/***/ 704:
 /***/ (function(module) {
 
 module.exports = eval("require")("debug");
 
 
 /***/ }),
-/* 705 */,
-/* 706 */,
-/* 707 */,
-/* 708 */
+
+/***/ 708:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -31050,169 +23194,8 @@ Writable.prototype._destroy = function (err, cb) {
 };
 
 /***/ }),
-/* 709 */,
-/* 710 */
-/***/ (function(module) {
 
-"use strict";
-
-
-module.exports = {
-	"aliceblue": [240, 248, 255],
-	"antiquewhite": [250, 235, 215],
-	"aqua": [0, 255, 255],
-	"aquamarine": [127, 255, 212],
-	"azure": [240, 255, 255],
-	"beige": [245, 245, 220],
-	"bisque": [255, 228, 196],
-	"black": [0, 0, 0],
-	"blanchedalmond": [255, 235, 205],
-	"blue": [0, 0, 255],
-	"blueviolet": [138, 43, 226],
-	"brown": [165, 42, 42],
-	"burlywood": [222, 184, 135],
-	"cadetblue": [95, 158, 160],
-	"chartreuse": [127, 255, 0],
-	"chocolate": [210, 105, 30],
-	"coral": [255, 127, 80],
-	"cornflowerblue": [100, 149, 237],
-	"cornsilk": [255, 248, 220],
-	"crimson": [220, 20, 60],
-	"cyan": [0, 255, 255],
-	"darkblue": [0, 0, 139],
-	"darkcyan": [0, 139, 139],
-	"darkgoldenrod": [184, 134, 11],
-	"darkgray": [169, 169, 169],
-	"darkgreen": [0, 100, 0],
-	"darkgrey": [169, 169, 169],
-	"darkkhaki": [189, 183, 107],
-	"darkmagenta": [139, 0, 139],
-	"darkolivegreen": [85, 107, 47],
-	"darkorange": [255, 140, 0],
-	"darkorchid": [153, 50, 204],
-	"darkred": [139, 0, 0],
-	"darksalmon": [233, 150, 122],
-	"darkseagreen": [143, 188, 143],
-	"darkslateblue": [72, 61, 139],
-	"darkslategray": [47, 79, 79],
-	"darkslategrey": [47, 79, 79],
-	"darkturquoise": [0, 206, 209],
-	"darkviolet": [148, 0, 211],
-	"deeppink": [255, 20, 147],
-	"deepskyblue": [0, 191, 255],
-	"dimgray": [105, 105, 105],
-	"dimgrey": [105, 105, 105],
-	"dodgerblue": [30, 144, 255],
-	"firebrick": [178, 34, 34],
-	"floralwhite": [255, 250, 240],
-	"forestgreen": [34, 139, 34],
-	"fuchsia": [255, 0, 255],
-	"gainsboro": [220, 220, 220],
-	"ghostwhite": [248, 248, 255],
-	"gold": [255, 215, 0],
-	"goldenrod": [218, 165, 32],
-	"gray": [128, 128, 128],
-	"green": [0, 128, 0],
-	"greenyellow": [173, 255, 47],
-	"grey": [128, 128, 128],
-	"honeydew": [240, 255, 240],
-	"hotpink": [255, 105, 180],
-	"indianred": [205, 92, 92],
-	"indigo": [75, 0, 130],
-	"ivory": [255, 255, 240],
-	"khaki": [240, 230, 140],
-	"lavender": [230, 230, 250],
-	"lavenderblush": [255, 240, 245],
-	"lawngreen": [124, 252, 0],
-	"lemonchiffon": [255, 250, 205],
-	"lightblue": [173, 216, 230],
-	"lightcoral": [240, 128, 128],
-	"lightcyan": [224, 255, 255],
-	"lightgoldenrodyellow": [250, 250, 210],
-	"lightgray": [211, 211, 211],
-	"lightgreen": [144, 238, 144],
-	"lightgrey": [211, 211, 211],
-	"lightpink": [255, 182, 193],
-	"lightsalmon": [255, 160, 122],
-	"lightseagreen": [32, 178, 170],
-	"lightskyblue": [135, 206, 250],
-	"lightslategray": [119, 136, 153],
-	"lightslategrey": [119, 136, 153],
-	"lightsteelblue": [176, 196, 222],
-	"lightyellow": [255, 255, 224],
-	"lime": [0, 255, 0],
-	"limegreen": [50, 205, 50],
-	"linen": [250, 240, 230],
-	"magenta": [255, 0, 255],
-	"maroon": [128, 0, 0],
-	"mediumaquamarine": [102, 205, 170],
-	"mediumblue": [0, 0, 205],
-	"mediumorchid": [186, 85, 211],
-	"mediumpurple": [147, 112, 219],
-	"mediumseagreen": [60, 179, 113],
-	"mediumslateblue": [123, 104, 238],
-	"mediumspringgreen": [0, 250, 154],
-	"mediumturquoise": [72, 209, 204],
-	"mediumvioletred": [199, 21, 133],
-	"midnightblue": [25, 25, 112],
-	"mintcream": [245, 255, 250],
-	"mistyrose": [255, 228, 225],
-	"moccasin": [255, 228, 181],
-	"navajowhite": [255, 222, 173],
-	"navy": [0, 0, 128],
-	"oldlace": [253, 245, 230],
-	"olive": [128, 128, 0],
-	"olivedrab": [107, 142, 35],
-	"orange": [255, 165, 0],
-	"orangered": [255, 69, 0],
-	"orchid": [218, 112, 214],
-	"palegoldenrod": [238, 232, 170],
-	"palegreen": [152, 251, 152],
-	"paleturquoise": [175, 238, 238],
-	"palevioletred": [219, 112, 147],
-	"papayawhip": [255, 239, 213],
-	"peachpuff": [255, 218, 185],
-	"peru": [205, 133, 63],
-	"pink": [255, 192, 203],
-	"plum": [221, 160, 221],
-	"powderblue": [176, 224, 230],
-	"purple": [128, 0, 128],
-	"rebeccapurple": [102, 51, 153],
-	"red": [255, 0, 0],
-	"rosybrown": [188, 143, 143],
-	"royalblue": [65, 105, 225],
-	"saddlebrown": [139, 69, 19],
-	"salmon": [250, 128, 114],
-	"sandybrown": [244, 164, 96],
-	"seagreen": [46, 139, 87],
-	"seashell": [255, 245, 238],
-	"sienna": [160, 82, 45],
-	"silver": [192, 192, 192],
-	"skyblue": [135, 206, 235],
-	"slateblue": [106, 90, 205],
-	"slategray": [112, 128, 144],
-	"slategrey": [112, 128, 144],
-	"snow": [255, 250, 250],
-	"springgreen": [0, 255, 127],
-	"steelblue": [70, 130, 180],
-	"tan": [210, 180, 140],
-	"teal": [0, 128, 128],
-	"thistle": [216, 191, 216],
-	"tomato": [255, 99, 71],
-	"turquoise": [64, 224, 208],
-	"violet": [238, 130, 238],
-	"wheat": [245, 222, 179],
-	"white": [255, 255, 255],
-	"whitesmoke": [245, 245, 245],
-	"yellow": [255, 255, 0],
-	"yellowgreen": [154, 205, 50]
-};
-
-
-/***/ }),
-/* 711 */,
-/* 712 */,
-/* 713 */
+/***/ 713:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -31235,14 +23218,8 @@ module.exports = jsonFile
 
 
 /***/ }),
-/* 714 */,
-/* 715 */,
-/* 716 */,
-/* 717 */,
-/* 718 */,
-/* 719 */,
-/* 720 */,
-/* 721 */
+
+/***/ 721:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -31462,20 +23439,14 @@ function done(stream, er, data) {
 }
 
 /***/ }),
-/* 722 */,
-/* 723 */,
-/* 724 */,
-/* 725 */,
-/* 726 */,
-/* 727 */,
-/* 728 */,
-/* 729 */
+
+/***/ 729:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
 
 var utils = __webpack_require__(901);
-var support = __webpack_require__(188);
+var support = __webpack_require__(546);
 // private property
 var _keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
@@ -31582,7 +23553,8 @@ exports.decode = function(input) {
 
 
 /***/ }),
-/* 730 */
+
+/***/ 730:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -31932,7 +23904,8 @@ module.exports = function inflate_table(type, lens, lens_index, codes, table, ta
 
 
 /***/ }),
-/* 731 */
+
+/***/ 731:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -31951,9 +23924,8 @@ module.exports = {
 
 
 /***/ }),
-/* 732 */,
-/* 733 */,
-/* 734 */
+
+/***/ 734:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -32037,13 +24009,8 @@ module.exports = function crc32wrapper(input, crc) {
 
 
 /***/ }),
-/* 735 */,
-/* 736 */,
-/* 737 */,
-/* 738 */,
-/* 739 */,
-/* 740 */,
-/* 741 */
+
+/***/ 741:
 /***/ (function(__unusedmodule, exports) {
 
 "use strict";
@@ -32074,7 +24041,8 @@ exports.fromPromise = function (fn) {
 
 
 /***/ }),
-/* 742 */
+
+/***/ 742:
 /***/ (function(module) {
 
 "use strict";
@@ -32132,361 +24100,15 @@ module.exports = adler32;
 
 
 /***/ }),
-/* 743 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-
-// A linked list to keep track of recently-used-ness
-const Yallist = __webpack_require__(106)
-
-const MAX = Symbol('max')
-const LENGTH = Symbol('length')
-const LENGTH_CALCULATOR = Symbol('lengthCalculator')
-const ALLOW_STALE = Symbol('allowStale')
-const MAX_AGE = Symbol('maxAge')
-const DISPOSE = Symbol('dispose')
-const NO_DISPOSE_ON_SET = Symbol('noDisposeOnSet')
-const LRU_LIST = Symbol('lruList')
-const CACHE = Symbol('cache')
-const UPDATE_AGE_ON_GET = Symbol('updateAgeOnGet')
-
-const naiveLength = () => 1
-
-// lruList is a yallist where the head is the youngest
-// item, and the tail is the oldest.  the list contains the Hit
-// objects as the entries.
-// Each Hit object has a reference to its Yallist.Node.  This
-// never changes.
-//
-// cache is a Map (or PseudoMap) that matches the keys to
-// the Yallist.Node object.
-class LRUCache {
-  constructor (options) {
-    if (typeof options === 'number')
-      options = { max: options }
-
-    if (!options)
-      options = {}
-
-    if (options.max && (typeof options.max !== 'number' || options.max < 0))
-      throw new TypeError('max must be a non-negative number')
-    // Kind of weird to have a default max of Infinity, but oh well.
-    const max = this[MAX] = options.max || Infinity
-
-    const lc = options.length || naiveLength
-    this[LENGTH_CALCULATOR] = (typeof lc !== 'function') ? naiveLength : lc
-    this[ALLOW_STALE] = options.stale || false
-    if (options.maxAge && typeof options.maxAge !== 'number')
-      throw new TypeError('maxAge must be a number')
-    this[MAX_AGE] = options.maxAge || 0
-    this[DISPOSE] = options.dispose
-    this[NO_DISPOSE_ON_SET] = options.noDisposeOnSet || false
-    this[UPDATE_AGE_ON_GET] = options.updateAgeOnGet || false
-    this.reset()
-  }
-
-  // resize the cache when the max changes.
-  set max (mL) {
-    if (typeof mL !== 'number' || mL < 0)
-      throw new TypeError('max must be a non-negative number')
-
-    this[MAX] = mL || Infinity
-    trim(this)
-  }
-  get max () {
-    return this[MAX]
-  }
-
-  set allowStale (allowStale) {
-    this[ALLOW_STALE] = !!allowStale
-  }
-  get allowStale () {
-    return this[ALLOW_STALE]
-  }
-
-  set maxAge (mA) {
-    if (typeof mA !== 'number')
-      throw new TypeError('maxAge must be a non-negative number')
-
-    this[MAX_AGE] = mA
-    trim(this)
-  }
-  get maxAge () {
-    return this[MAX_AGE]
-  }
-
-  // resize the cache when the lengthCalculator changes.
-  set lengthCalculator (lC) {
-    if (typeof lC !== 'function')
-      lC = naiveLength
-
-    if (lC !== this[LENGTH_CALCULATOR]) {
-      this[LENGTH_CALCULATOR] = lC
-      this[LENGTH] = 0
-      this[LRU_LIST].forEach(hit => {
-        hit.length = this[LENGTH_CALCULATOR](hit.value, hit.key)
-        this[LENGTH] += hit.length
-      })
-    }
-    trim(this)
-  }
-  get lengthCalculator () { return this[LENGTH_CALCULATOR] }
-
-  get length () { return this[LENGTH] }
-  get itemCount () { return this[LRU_LIST].length }
-
-  rforEach (fn, thisp) {
-    thisp = thisp || this
-    for (let walker = this[LRU_LIST].tail; walker !== null;) {
-      const prev = walker.prev
-      forEachStep(this, fn, walker, thisp)
-      walker = prev
-    }
-  }
-
-  forEach (fn, thisp) {
-    thisp = thisp || this
-    for (let walker = this[LRU_LIST].head; walker !== null;) {
-      const next = walker.next
-      forEachStep(this, fn, walker, thisp)
-      walker = next
-    }
-  }
-
-  keys () {
-    return this[LRU_LIST].toArray().map(k => k.key)
-  }
-
-  values () {
-    return this[LRU_LIST].toArray().map(k => k.value)
-  }
-
-  reset () {
-    if (this[DISPOSE] &&
-        this[LRU_LIST] &&
-        this[LRU_LIST].length) {
-      this[LRU_LIST].forEach(hit => this[DISPOSE](hit.key, hit.value))
-    }
-
-    this[CACHE] = new Map() // hash of items by key
-    this[LRU_LIST] = new Yallist() // list of items in order of use recency
-    this[LENGTH] = 0 // length of items in the list
-  }
-
-  dump () {
-    return this[LRU_LIST].map(hit =>
-      isStale(this, hit) ? false : {
-        k: hit.key,
-        v: hit.value,
-        e: hit.now + (hit.maxAge || 0)
-      }).toArray().filter(h => h)
-  }
-
-  dumpLru () {
-    return this[LRU_LIST]
-  }
-
-  set (key, value, maxAge) {
-    maxAge = maxAge || this[MAX_AGE]
-
-    if (maxAge && typeof maxAge !== 'number')
-      throw new TypeError('maxAge must be a number')
-
-    const now = maxAge ? Date.now() : 0
-    const len = this[LENGTH_CALCULATOR](value, key)
-
-    if (this[CACHE].has(key)) {
-      if (len > this[MAX]) {
-        del(this, this[CACHE].get(key))
-        return false
-      }
-
-      const node = this[CACHE].get(key)
-      const item = node.value
-
-      // dispose of the old one before overwriting
-      // split out into 2 ifs for better coverage tracking
-      if (this[DISPOSE]) {
-        if (!this[NO_DISPOSE_ON_SET])
-          this[DISPOSE](key, item.value)
-      }
-
-      item.now = now
-      item.maxAge = maxAge
-      item.value = value
-      this[LENGTH] += len - item.length
-      item.length = len
-      this.get(key)
-      trim(this)
-      return true
-    }
-
-    const hit = new Entry(key, value, len, now, maxAge)
-
-    // oversized objects fall out of cache automatically.
-    if (hit.length > this[MAX]) {
-      if (this[DISPOSE])
-        this[DISPOSE](key, value)
-
-      return false
-    }
-
-    this[LENGTH] += hit.length
-    this[LRU_LIST].unshift(hit)
-    this[CACHE].set(key, this[LRU_LIST].head)
-    trim(this)
-    return true
-  }
-
-  has (key) {
-    if (!this[CACHE].has(key)) return false
-    const hit = this[CACHE].get(key).value
-    return !isStale(this, hit)
-  }
-
-  get (key) {
-    return get(this, key, true)
-  }
-
-  peek (key) {
-    return get(this, key, false)
-  }
-
-  pop () {
-    const node = this[LRU_LIST].tail
-    if (!node)
-      return null
-
-    del(this, node)
-    return node.value
-  }
-
-  del (key) {
-    del(this, this[CACHE].get(key))
-  }
-
-  load (arr) {
-    // reset the cache
-    this.reset()
-
-    const now = Date.now()
-    // A previous serialized cache has the most recent items first
-    for (let l = arr.length - 1; l >= 0; l--) {
-      const hit = arr[l]
-      const expiresAt = hit.e || 0
-      if (expiresAt === 0)
-        // the item was created without expiration in a non aged cache
-        this.set(hit.k, hit.v)
-      else {
-        const maxAge = expiresAt - now
-        // dont add already expired items
-        if (maxAge > 0) {
-          this.set(hit.k, hit.v, maxAge)
-        }
-      }
-    }
-  }
-
-  prune () {
-    this[CACHE].forEach((value, key) => get(this, key, false))
-  }
-}
-
-const get = (self, key, doUse) => {
-  const node = self[CACHE].get(key)
-  if (node) {
-    const hit = node.value
-    if (isStale(self, hit)) {
-      del(self, node)
-      if (!self[ALLOW_STALE])
-        return undefined
-    } else {
-      if (doUse) {
-        if (self[UPDATE_AGE_ON_GET])
-          node.value.now = Date.now()
-        self[LRU_LIST].unshiftNode(node)
-      }
-    }
-    return hit.value
-  }
-}
-
-const isStale = (self, hit) => {
-  if (!hit || (!hit.maxAge && !self[MAX_AGE]))
-    return false
-
-  const diff = Date.now() - hit.now
-  return hit.maxAge ? diff > hit.maxAge
-    : self[MAX_AGE] && (diff > self[MAX_AGE])
-}
-
-const trim = self => {
-  if (self[LENGTH] > self[MAX]) {
-    for (let walker = self[LRU_LIST].tail;
-      self[LENGTH] > self[MAX] && walker !== null;) {
-      // We know that we're about to delete this one, and also
-      // what the next least recently used key will be, so just
-      // go ahead and set it now.
-      const prev = walker.prev
-      del(self, walker)
-      walker = prev
-    }
-  }
-}
-
-const del = (self, node) => {
-  if (node) {
-    const hit = node.value
-    if (self[DISPOSE])
-      self[DISPOSE](hit.key, hit.value)
-
-    self[LENGTH] -= hit.length
-    self[CACHE].delete(hit.key)
-    self[LRU_LIST].removeNode(node)
-  }
-}
-
-class Entry {
-  constructor (key, value, length, now, maxAge) {
-    this.key = key
-    this.value = value
-    this.length = length
-    this.now = now
-    this.maxAge = maxAge || 0
-  }
-}
-
-const forEachStep = (self, fn, node, thisp) => {
-  let hit = node.value
-  if (isStale(self, hit)) {
-    del(self, node)
-    if (!self[ALLOW_STALE])
-      hit = undefined
-  }
-  if (hit)
-    fn.call(thisp, hit.value, hit.key, self)
-}
-
-module.exports = LRUCache
-
-
-/***/ }),
-/* 744 */,
-/* 745 */,
-/* 746 */,
-/* 747 */
+/***/ 747:
 /***/ (function(module) {
 
 module.exports = require("fs");
 
 /***/ }),
-/* 748 */,
-/* 749 */,
-/* 750 */,
-/* 751 */,
-/* 752 */
+
+/***/ 752:
 /***/ (function(module) {
 
 "use strict";
@@ -32498,11 +24120,8 @@ module.exports = function isCancel(value) {
 
 
 /***/ }),
-/* 753 */,
-/* 754 */,
-/* 755 */,
-/* 756 */,
-/* 757 */
+
+/***/ 757:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -32648,25 +24267,22 @@ module.exports = {
 
 
 /***/ }),
-/* 758 */,
-/* 759 */,
-/* 760 */,
-/* 761 */
+
+/***/ 761:
 /***/ (function(module) {
 
 module.exports = require("zlib");
 
 /***/ }),
-/* 762 */,
-/* 763 */,
-/* 764 */,
-/* 765 */
+
+/***/ 765:
 /***/ (function(module) {
 
 module.exports = require("process");
 
 /***/ }),
-/* 766 */
+
+/***/ 766:
 /***/ (function(module) {
 
 "use strict";
@@ -32687,316 +24303,8 @@ module.exports = function isAbsoluteURL(url) {
 
 
 /***/ }),
-/* 767 */,
-/* 768 */,
-/* 769 */,
-/* 770 */,
-/* 771 */,
-/* 772 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-var readerFor = __webpack_require__(298);
-var utils = __webpack_require__(901);
-var CompressedObject = __webpack_require__(454);
-var crc32fn = __webpack_require__(734);
-var utf8 = __webpack_require__(341);
-var compressions = __webpack_require__(703);
-var support = __webpack_require__(188);
-
-var MADE_BY_DOS = 0x00;
-var MADE_BY_UNIX = 0x03;
-
-/**
- * Find a compression registered in JSZip.
- * @param {string} compressionMethod the method magic to find.
- * @return {Object|null} the JSZip compression object, null if none found.
- */
-var findCompression = function(compressionMethod) {
-    for (var method in compressions) {
-        if (!compressions.hasOwnProperty(method)) {
-            continue;
-        }
-        if (compressions[method].magic === compressionMethod) {
-            return compressions[method];
-        }
-    }
-    return null;
-};
-
-// class ZipEntry {{{
-/**
- * An entry in the zip file.
- * @constructor
- * @param {Object} options Options of the current file.
- * @param {Object} loadOptions Options for loading the stream.
- */
-function ZipEntry(options, loadOptions) {
-    this.options = options;
-    this.loadOptions = loadOptions;
-}
-ZipEntry.prototype = {
-    /**
-     * say if the file is encrypted.
-     * @return {boolean} true if the file is encrypted, false otherwise.
-     */
-    isEncrypted: function() {
-        // bit 1 is set
-        return (this.bitFlag & 0x0001) === 0x0001;
-    },
-    /**
-     * say if the file has utf-8 filename/comment.
-     * @return {boolean} true if the filename/comment is in utf-8, false otherwise.
-     */
-    useUTF8: function() {
-        // bit 11 is set
-        return (this.bitFlag & 0x0800) === 0x0800;
-    },
-    /**
-     * Read the local part of a zip file and add the info in this object.
-     * @param {DataReader} reader the reader to use.
-     */
-    readLocalPart: function(reader) {
-        var compression, localExtraFieldsLength;
-
-        // we already know everything from the central dir !
-        // If the central dir data are false, we are doomed.
-        // On the bright side, the local part is scary  : zip64, data descriptors, both, etc.
-        // The less data we get here, the more reliable this should be.
-        // Let's skip the whole header and dash to the data !
-        reader.skip(22);
-        // in some zip created on windows, the filename stored in the central dir contains \ instead of /.
-        // Strangely, the filename here is OK.
-        // I would love to treat these zip files as corrupted (see http://www.info-zip.org/FAQ.html#backslashes
-        // or APPNOTE#4.4.17.1, "All slashes MUST be forward slashes '/'") but there are a lot of bad zip generators...
-        // Search "unzip mismatching "local" filename continuing with "central" filename version" on
-        // the internet.
-        //
-        // I think I see the logic here : the central directory is used to display
-        // content and the local directory is used to extract the files. Mixing / and \
-        // may be used to display \ to windows users and use / when extracting the files.
-        // Unfortunately, this lead also to some issues : http://seclists.org/fulldisclosure/2009/Sep/394
-        this.fileNameLength = reader.readInt(2);
-        localExtraFieldsLength = reader.readInt(2); // can't be sure this will be the same as the central dir
-        // the fileName is stored as binary data, the handleUTF8 method will take care of the encoding.
-        this.fileName = reader.readData(this.fileNameLength);
-        reader.skip(localExtraFieldsLength);
-
-        if (this.compressedSize === -1 || this.uncompressedSize === -1) {
-            throw new Error("Bug or corrupted zip : didn't get enough information from the central directory " + "(compressedSize === -1 || uncompressedSize === -1)");
-        }
-
-        compression = findCompression(this.compressionMethod);
-        if (compression === null) { // no compression found
-            throw new Error("Corrupted zip : compression " + utils.pretty(this.compressionMethod) + " unknown (inner file : " + utils.transformTo("string", this.fileName) + ")");
-        }
-        this.decompressed = new CompressedObject(this.compressedSize, this.uncompressedSize, this.crc32, compression, reader.readData(this.compressedSize));
-    },
-
-    /**
-     * Read the central part of a zip file and add the info in this object.
-     * @param {DataReader} reader the reader to use.
-     */
-    readCentralPart: function(reader) {
-        this.versionMadeBy = reader.readInt(2);
-        reader.skip(2);
-        // this.versionNeeded = reader.readInt(2);
-        this.bitFlag = reader.readInt(2);
-        this.compressionMethod = reader.readString(2);
-        this.date = reader.readDate();
-        this.crc32 = reader.readInt(4);
-        this.compressedSize = reader.readInt(4);
-        this.uncompressedSize = reader.readInt(4);
-        var fileNameLength = reader.readInt(2);
-        this.extraFieldsLength = reader.readInt(2);
-        this.fileCommentLength = reader.readInt(2);
-        this.diskNumberStart = reader.readInt(2);
-        this.internalFileAttributes = reader.readInt(2);
-        this.externalFileAttributes = reader.readInt(4);
-        this.localHeaderOffset = reader.readInt(4);
-
-        if (this.isEncrypted()) {
-            throw new Error("Encrypted zip are not supported");
-        }
-
-        // will be read in the local part, see the comments there
-        reader.skip(fileNameLength);
-        this.readExtraFields(reader);
-        this.parseZIP64ExtraField(reader);
-        this.fileComment = reader.readData(this.fileCommentLength);
-    },
-
-    /**
-     * Parse the external file attributes and get the unix/dos permissions.
-     */
-    processAttributes: function () {
-        this.unixPermissions = null;
-        this.dosPermissions = null;
-        var madeBy = this.versionMadeBy >> 8;
-
-        // Check if we have the DOS directory flag set.
-        // We look for it in the DOS and UNIX permissions
-        // but some unknown platform could set it as a compatibility flag.
-        this.dir = this.externalFileAttributes & 0x0010 ? true : false;
-
-        if(madeBy === MADE_BY_DOS) {
-            // first 6 bits (0 to 5)
-            this.dosPermissions = this.externalFileAttributes & 0x3F;
-        }
-
-        if(madeBy === MADE_BY_UNIX) {
-            this.unixPermissions = (this.externalFileAttributes >> 16) & 0xFFFF;
-            // the octal permissions are in (this.unixPermissions & 0x01FF).toString(8);
-        }
-
-        // fail safe : if the name ends with a / it probably means a folder
-        if (!this.dir && this.fileNameStr.slice(-1) === '/') {
-            this.dir = true;
-        }
-    },
-
-    /**
-     * Parse the ZIP64 extra field and merge the info in the current ZipEntry.
-     * @param {DataReader} reader the reader to use.
-     */
-    parseZIP64ExtraField: function(reader) {
-
-        if (!this.extraFields[0x0001]) {
-            return;
-        }
-
-        // should be something, preparing the extra reader
-        var extraReader = readerFor(this.extraFields[0x0001].value);
-
-        // I really hope that these 64bits integer can fit in 32 bits integer, because js
-        // won't let us have more.
-        if (this.uncompressedSize === utils.MAX_VALUE_32BITS) {
-            this.uncompressedSize = extraReader.readInt(8);
-        }
-        if (this.compressedSize === utils.MAX_VALUE_32BITS) {
-            this.compressedSize = extraReader.readInt(8);
-        }
-        if (this.localHeaderOffset === utils.MAX_VALUE_32BITS) {
-            this.localHeaderOffset = extraReader.readInt(8);
-        }
-        if (this.diskNumberStart === utils.MAX_VALUE_32BITS) {
-            this.diskNumberStart = extraReader.readInt(4);
-        }
-    },
-    /**
-     * Read the central part of a zip file and add the info in this object.
-     * @param {DataReader} reader the reader to use.
-     */
-    readExtraFields: function(reader) {
-        var end = reader.index + this.extraFieldsLength,
-            extraFieldId,
-            extraFieldLength,
-            extraFieldValue;
-
-        if (!this.extraFields) {
-            this.extraFields = {};
-        }
-
-        while (reader.index + 4 < end) {
-            extraFieldId = reader.readInt(2);
-            extraFieldLength = reader.readInt(2);
-            extraFieldValue = reader.readData(extraFieldLength);
-
-            this.extraFields[extraFieldId] = {
-                id: extraFieldId,
-                length: extraFieldLength,
-                value: extraFieldValue
-            };
-        }
-
-        reader.setIndex(end);
-    },
-    /**
-     * Apply an UTF8 transformation if needed.
-     */
-    handleUTF8: function() {
-        var decodeParamType = support.uint8array ? "uint8array" : "array";
-        if (this.useUTF8()) {
-            this.fileNameStr = utf8.utf8decode(this.fileName);
-            this.fileCommentStr = utf8.utf8decode(this.fileComment);
-        } else {
-            var upath = this.findExtraFieldUnicodePath();
-            if (upath !== null) {
-                this.fileNameStr = upath;
-            } else {
-                // ASCII text or unsupported code page
-                var fileNameByteArray =  utils.transformTo(decodeParamType, this.fileName);
-                this.fileNameStr = this.loadOptions.decodeFileName(fileNameByteArray);
-            }
-
-            var ucomment = this.findExtraFieldUnicodeComment();
-            if (ucomment !== null) {
-                this.fileCommentStr = ucomment;
-            } else {
-                // ASCII text or unsupported code page
-                var commentByteArray =  utils.transformTo(decodeParamType, this.fileComment);
-                this.fileCommentStr = this.loadOptions.decodeFileName(commentByteArray);
-            }
-        }
-    },
-
-    /**
-     * Find the unicode path declared in the extra field, if any.
-     * @return {String} the unicode path, null otherwise.
-     */
-    findExtraFieldUnicodePath: function() {
-        var upathField = this.extraFields[0x7075];
-        if (upathField) {
-            var extraReader = readerFor(upathField.value);
-
-            // wrong version
-            if (extraReader.readInt(1) !== 1) {
-                return null;
-            }
-
-            // the crc of the filename changed, this field is out of date.
-            if (crc32fn(this.fileName) !== extraReader.readInt(4)) {
-                return null;
-            }
-
-            return utf8.utf8decode(extraReader.readData(upathField.length - 5));
-        }
-        return null;
-    },
-
-    /**
-     * Find the unicode comment declared in the extra field, if any.
-     * @return {String} the unicode comment, null otherwise.
-     */
-    findExtraFieldUnicodeComment: function() {
-        var ucommentField = this.extraFields[0x6375];
-        if (ucommentField) {
-            var extraReader = readerFor(ucommentField.value);
-
-            // wrong version
-            if (extraReader.readInt(1) !== 1) {
-                return null;
-            }
-
-            // the crc of the comment changed, this field is out of date.
-            if (crc32fn(this.fileComment) !== extraReader.readInt(4)) {
-                return null;
-            }
-
-            return utf8.utf8decode(extraReader.readData(ucommentField.length - 5));
-        }
-        return null;
-    }
-};
-module.exports = ZipEntry;
-
-
-/***/ }),
-/* 773 */,
-/* 774 */,
-/* 775 */,
-/* 776 */
+/***/ 776:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -33030,10 +24338,8 @@ if (Object.getOwnPropertyDescriptor(fs, 'promises')) {
 
 
 /***/ }),
-/* 777 */,
-/* 778 */,
-/* 779 */,
-/* 780 */
+
+/***/ 780:
 /***/ (function(module) {
 
 "use strict";
@@ -33385,7 +24691,8 @@ module.exports = function inflate_fast(strm, start) {
 
 
 /***/ }),
-/* 781 */
+
+/***/ 781:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -33479,10 +24786,8 @@ module.exports = function mergeConfig(config1, config2) {
 
 
 /***/ }),
-/* 782 */,
-/* 783 */,
-/* 784 */,
-/* 785 */
+
+/***/ 785:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var constants = __webpack_require__(619)
@@ -33834,17 +25139,1238 @@ function patch (fs) {
 
 
 /***/ }),
-/* 786 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const compare = __webpack_require__(233)
-const compareLoose = (a, b) => compare(a, b, true)
-module.exports = compareLoose
+/***/ 786:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+/* eslint-disable space-unary-ops */
+
+var utils = __webpack_require__(33);
+
+/* Public constants ==========================================================*/
+/* ===========================================================================*/
+
+
+//var Z_FILTERED          = 1;
+//var Z_HUFFMAN_ONLY      = 2;
+//var Z_RLE               = 3;
+var Z_FIXED               = 4;
+//var Z_DEFAULT_STRATEGY  = 0;
+
+/* Possible values of the data_type field (though see inflate()) */
+var Z_BINARY              = 0;
+var Z_TEXT                = 1;
+//var Z_ASCII             = 1; // = Z_TEXT
+var Z_UNKNOWN             = 2;
+
+/*============================================================================*/
+
+
+function zero(buf) { var len = buf.length; while (--len >= 0) { buf[len] = 0; } }
+
+// From zutil.h
+
+var STORED_BLOCK = 0;
+var STATIC_TREES = 1;
+var DYN_TREES    = 2;
+/* The three kinds of block type */
+
+var MIN_MATCH    = 3;
+var MAX_MATCH    = 258;
+/* The minimum and maximum match lengths */
+
+// From deflate.h
+/* ===========================================================================
+ * Internal compression state.
+ */
+
+var LENGTH_CODES  = 29;
+/* number of length codes, not counting the special END_BLOCK code */
+
+var LITERALS      = 256;
+/* number of literal bytes 0..255 */
+
+var L_CODES       = LITERALS + 1 + LENGTH_CODES;
+/* number of Literal or Length codes, including the END_BLOCK code */
+
+var D_CODES       = 30;
+/* number of distance codes */
+
+var BL_CODES      = 19;
+/* number of codes used to transfer the bit lengths */
+
+var HEAP_SIZE     = 2 * L_CODES + 1;
+/* maximum heap size */
+
+var MAX_BITS      = 15;
+/* All codes must not exceed MAX_BITS bits */
+
+var Buf_size      = 16;
+/* size of bit buffer in bi_buf */
+
+
+/* ===========================================================================
+ * Constants
+ */
+
+var MAX_BL_BITS = 7;
+/* Bit length codes must not exceed MAX_BL_BITS bits */
+
+var END_BLOCK   = 256;
+/* end of block literal code */
+
+var REP_3_6     = 16;
+/* repeat previous bit length 3-6 times (2 bits of repeat count) */
+
+var REPZ_3_10   = 17;
+/* repeat a zero length 3-10 times  (3 bits of repeat count) */
+
+var REPZ_11_138 = 18;
+/* repeat a zero length 11-138 times  (7 bits of repeat count) */
+
+/* eslint-disable comma-spacing,array-bracket-spacing */
+var extra_lbits =   /* extra bits for each length code */
+  [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+
+var extra_dbits =   /* extra bits for each distance code */
+  [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+
+var extra_blbits =  /* extra bits for each bit length code */
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7];
+
+var bl_order =
+  [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+/* eslint-enable comma-spacing,array-bracket-spacing */
+
+/* The lengths of the bit length codes are sent in order of decreasing
+ * probability, to avoid transmitting the lengths for unused bit length codes.
+ */
+
+/* ===========================================================================
+ * Local data. These are initialized only once.
+ */
+
+// We pre-fill arrays with 0 to avoid uninitialized gaps
+
+var DIST_CODE_LEN = 512; /* see definition of array dist_code below */
+
+// !!!! Use flat array instead of structure, Freq = i*2, Len = i*2+1
+var static_ltree  = new Array((L_CODES + 2) * 2);
+zero(static_ltree);
+/* The static literal tree. Since the bit lengths are imposed, there is no
+ * need for the L_CODES extra codes used during heap construction. However
+ * The codes 286 and 287 are needed to build a canonical tree (see _tr_init
+ * below).
+ */
+
+var static_dtree  = new Array(D_CODES * 2);
+zero(static_dtree);
+/* The static distance tree. (Actually a trivial tree since all codes use
+ * 5 bits.)
+ */
+
+var _dist_code    = new Array(DIST_CODE_LEN);
+zero(_dist_code);
+/* Distance codes. The first 256 values correspond to the distances
+ * 3 .. 258, the last 256 values correspond to the top 8 bits of
+ * the 15 bit distances.
+ */
+
+var _length_code  = new Array(MAX_MATCH - MIN_MATCH + 1);
+zero(_length_code);
+/* length code for each normalized match length (0 == MIN_MATCH) */
+
+var base_length   = new Array(LENGTH_CODES);
+zero(base_length);
+/* First normalized length for each code (0 = MIN_MATCH) */
+
+var base_dist     = new Array(D_CODES);
+zero(base_dist);
+/* First normalized distance for each code (0 = distance of 1) */
+
+
+function StaticTreeDesc(static_tree, extra_bits, extra_base, elems, max_length) {
+
+  this.static_tree  = static_tree;  /* static tree or NULL */
+  this.extra_bits   = extra_bits;   /* extra bits for each code or NULL */
+  this.extra_base   = extra_base;   /* base index for extra_bits */
+  this.elems        = elems;        /* max number of elements in the tree */
+  this.max_length   = max_length;   /* max bit length for the codes */
+
+  // show if `static_tree` has data or dummy - needed for monomorphic objects
+  this.has_stree    = static_tree && static_tree.length;
+}
+
+
+var static_l_desc;
+var static_d_desc;
+var static_bl_desc;
+
+
+function TreeDesc(dyn_tree, stat_desc) {
+  this.dyn_tree = dyn_tree;     /* the dynamic tree */
+  this.max_code = 0;            /* largest code with non zero frequency */
+  this.stat_desc = stat_desc;   /* the corresponding static tree */
+}
+
+
+
+function d_code(dist) {
+  return dist < 256 ? _dist_code[dist] : _dist_code[256 + (dist >>> 7)];
+}
+
+
+/* ===========================================================================
+ * Output a short LSB first on the stream.
+ * IN assertion: there is enough room in pendingBuf.
+ */
+function put_short(s, w) {
+//    put_byte(s, (uch)((w) & 0xff));
+//    put_byte(s, (uch)((ush)(w) >> 8));
+  s.pending_buf[s.pending++] = (w) & 0xff;
+  s.pending_buf[s.pending++] = (w >>> 8) & 0xff;
+}
+
+
+/* ===========================================================================
+ * Send a value on a given number of bits.
+ * IN assertion: length <= 16 and value fits in length bits.
+ */
+function send_bits(s, value, length) {
+  if (s.bi_valid > (Buf_size - length)) {
+    s.bi_buf |= (value << s.bi_valid) & 0xffff;
+    put_short(s, s.bi_buf);
+    s.bi_buf = value >> (Buf_size - s.bi_valid);
+    s.bi_valid += length - Buf_size;
+  } else {
+    s.bi_buf |= (value << s.bi_valid) & 0xffff;
+    s.bi_valid += length;
+  }
+}
+
+
+function send_code(s, c, tree) {
+  send_bits(s, tree[c * 2]/*.Code*/, tree[c * 2 + 1]/*.Len*/);
+}
+
+
+/* ===========================================================================
+ * Reverse the first len bits of a code, using straightforward code (a faster
+ * method would use a table)
+ * IN assertion: 1 <= len <= 15
+ */
+function bi_reverse(code, len) {
+  var res = 0;
+  do {
+    res |= code & 1;
+    code >>>= 1;
+    res <<= 1;
+  } while (--len > 0);
+  return res >>> 1;
+}
+
+
+/* ===========================================================================
+ * Flush the bit buffer, keeping at most 7 bits in it.
+ */
+function bi_flush(s) {
+  if (s.bi_valid === 16) {
+    put_short(s, s.bi_buf);
+    s.bi_buf = 0;
+    s.bi_valid = 0;
+
+  } else if (s.bi_valid >= 8) {
+    s.pending_buf[s.pending++] = s.bi_buf & 0xff;
+    s.bi_buf >>= 8;
+    s.bi_valid -= 8;
+  }
+}
+
+
+/* ===========================================================================
+ * Compute the optimal bit lengths for a tree and update the total bit length
+ * for the current block.
+ * IN assertion: the fields freq and dad are set, heap[heap_max] and
+ *    above are the tree nodes sorted by increasing frequency.
+ * OUT assertions: the field len is set to the optimal bit length, the
+ *     array bl_count contains the frequencies for each bit length.
+ *     The length opt_len is updated; static_len is also updated if stree is
+ *     not null.
+ */
+function gen_bitlen(s, desc)
+//    deflate_state *s;
+//    tree_desc *desc;    /* the tree descriptor */
+{
+  var tree            = desc.dyn_tree;
+  var max_code        = desc.max_code;
+  var stree           = desc.stat_desc.static_tree;
+  var has_stree       = desc.stat_desc.has_stree;
+  var extra           = desc.stat_desc.extra_bits;
+  var base            = desc.stat_desc.extra_base;
+  var max_length      = desc.stat_desc.max_length;
+  var h;              /* heap index */
+  var n, m;           /* iterate over the tree elements */
+  var bits;           /* bit length */
+  var xbits;          /* extra bits */
+  var f;              /* frequency */
+  var overflow = 0;   /* number of elements with bit length too large */
+
+  for (bits = 0; bits <= MAX_BITS; bits++) {
+    s.bl_count[bits] = 0;
+  }
+
+  /* In a first pass, compute the optimal bit lengths (which may
+   * overflow in the case of the bit length tree).
+   */
+  tree[s.heap[s.heap_max] * 2 + 1]/*.Len*/ = 0; /* root of the heap */
+
+  for (h = s.heap_max + 1; h < HEAP_SIZE; h++) {
+    n = s.heap[h];
+    bits = tree[tree[n * 2 + 1]/*.Dad*/ * 2 + 1]/*.Len*/ + 1;
+    if (bits > max_length) {
+      bits = max_length;
+      overflow++;
+    }
+    tree[n * 2 + 1]/*.Len*/ = bits;
+    /* We overwrite tree[n].Dad which is no longer needed */
+
+    if (n > max_code) { continue; } /* not a leaf node */
+
+    s.bl_count[bits]++;
+    xbits = 0;
+    if (n >= base) {
+      xbits = extra[n - base];
+    }
+    f = tree[n * 2]/*.Freq*/;
+    s.opt_len += f * (bits + xbits);
+    if (has_stree) {
+      s.static_len += f * (stree[n * 2 + 1]/*.Len*/ + xbits);
+    }
+  }
+  if (overflow === 0) { return; }
+
+  // Trace((stderr,"\nbit length overflow\n"));
+  /* This happens for example on obj2 and pic of the Calgary corpus */
+
+  /* Find the first bit length which could increase: */
+  do {
+    bits = max_length - 1;
+    while (s.bl_count[bits] === 0) { bits--; }
+    s.bl_count[bits]--;      /* move one leaf down the tree */
+    s.bl_count[bits + 1] += 2; /* move one overflow item as its brother */
+    s.bl_count[max_length]--;
+    /* The brother of the overflow item also moves one step up,
+     * but this does not affect bl_count[max_length]
+     */
+    overflow -= 2;
+  } while (overflow > 0);
+
+  /* Now recompute all bit lengths, scanning in increasing frequency.
+   * h is still equal to HEAP_SIZE. (It is simpler to reconstruct all
+   * lengths instead of fixing only the wrong ones. This idea is taken
+   * from 'ar' written by Haruhiko Okumura.)
+   */
+  for (bits = max_length; bits !== 0; bits--) {
+    n = s.bl_count[bits];
+    while (n !== 0) {
+      m = s.heap[--h];
+      if (m > max_code) { continue; }
+      if (tree[m * 2 + 1]/*.Len*/ !== bits) {
+        // Trace((stderr,"code %d bits %d->%d\n", m, tree[m].Len, bits));
+        s.opt_len += (bits - tree[m * 2 + 1]/*.Len*/) * tree[m * 2]/*.Freq*/;
+        tree[m * 2 + 1]/*.Len*/ = bits;
+      }
+      n--;
+    }
+  }
+}
+
+
+/* ===========================================================================
+ * Generate the codes for a given tree and bit counts (which need not be
+ * optimal).
+ * IN assertion: the array bl_count contains the bit length statistics for
+ * the given tree and the field len is set for all tree elements.
+ * OUT assertion: the field code is set for all tree elements of non
+ *     zero code length.
+ */
+function gen_codes(tree, max_code, bl_count)
+//    ct_data *tree;             /* the tree to decorate */
+//    int max_code;              /* largest code with non zero frequency */
+//    ushf *bl_count;            /* number of codes at each bit length */
+{
+  var next_code = new Array(MAX_BITS + 1); /* next code value for each bit length */
+  var code = 0;              /* running code value */
+  var bits;                  /* bit index */
+  var n;                     /* code index */
+
+  /* The distribution counts are first used to generate the code values
+   * without bit reversal.
+   */
+  for (bits = 1; bits <= MAX_BITS; bits++) {
+    next_code[bits] = code = (code + bl_count[bits - 1]) << 1;
+  }
+  /* Check that the bit counts in bl_count are consistent. The last code
+   * must be all ones.
+   */
+  //Assert (code + bl_count[MAX_BITS]-1 == (1<<MAX_BITS)-1,
+  //        "inconsistent bit counts");
+  //Tracev((stderr,"\ngen_codes: max_code %d ", max_code));
+
+  for (n = 0;  n <= max_code; n++) {
+    var len = tree[n * 2 + 1]/*.Len*/;
+    if (len === 0) { continue; }
+    /* Now reverse the bits */
+    tree[n * 2]/*.Code*/ = bi_reverse(next_code[len]++, len);
+
+    //Tracecv(tree != static_ltree, (stderr,"\nn %3d %c l %2d c %4x (%x) ",
+    //     n, (isgraph(n) ? n : ' '), len, tree[n].Code, next_code[len]-1));
+  }
+}
+
+
+/* ===========================================================================
+ * Initialize the various 'constant' tables.
+ */
+function tr_static_init() {
+  var n;        /* iterates over tree elements */
+  var bits;     /* bit counter */
+  var length;   /* length value */
+  var code;     /* code value */
+  var dist;     /* distance index */
+  var bl_count = new Array(MAX_BITS + 1);
+  /* number of codes at each bit length for an optimal tree */
+
+  // do check in _tr_init()
+  //if (static_init_done) return;
+
+  /* For some embedded targets, global variables are not initialized: */
+/*#ifdef NO_INIT_GLOBAL_POINTERS
+  static_l_desc.static_tree = static_ltree;
+  static_l_desc.extra_bits = extra_lbits;
+  static_d_desc.static_tree = static_dtree;
+  static_d_desc.extra_bits = extra_dbits;
+  static_bl_desc.extra_bits = extra_blbits;
+#endif*/
+
+  /* Initialize the mapping length (0..255) -> length code (0..28) */
+  length = 0;
+  for (code = 0; code < LENGTH_CODES - 1; code++) {
+    base_length[code] = length;
+    for (n = 0; n < (1 << extra_lbits[code]); n++) {
+      _length_code[length++] = code;
+    }
+  }
+  //Assert (length == 256, "tr_static_init: length != 256");
+  /* Note that the length 255 (match length 258) can be represented
+   * in two different ways: code 284 + 5 bits or code 285, so we
+   * overwrite length_code[255] to use the best encoding:
+   */
+  _length_code[length - 1] = code;
+
+  /* Initialize the mapping dist (0..32K) -> dist code (0..29) */
+  dist = 0;
+  for (code = 0; code < 16; code++) {
+    base_dist[code] = dist;
+    for (n = 0; n < (1 << extra_dbits[code]); n++) {
+      _dist_code[dist++] = code;
+    }
+  }
+  //Assert (dist == 256, "tr_static_init: dist != 256");
+  dist >>= 7; /* from now on, all distances are divided by 128 */
+  for (; code < D_CODES; code++) {
+    base_dist[code] = dist << 7;
+    for (n = 0; n < (1 << (extra_dbits[code] - 7)); n++) {
+      _dist_code[256 + dist++] = code;
+    }
+  }
+  //Assert (dist == 256, "tr_static_init: 256+dist != 512");
+
+  /* Construct the codes of the static literal tree */
+  for (bits = 0; bits <= MAX_BITS; bits++) {
+    bl_count[bits] = 0;
+  }
+
+  n = 0;
+  while (n <= 143) {
+    static_ltree[n * 2 + 1]/*.Len*/ = 8;
+    n++;
+    bl_count[8]++;
+  }
+  while (n <= 255) {
+    static_ltree[n * 2 + 1]/*.Len*/ = 9;
+    n++;
+    bl_count[9]++;
+  }
+  while (n <= 279) {
+    static_ltree[n * 2 + 1]/*.Len*/ = 7;
+    n++;
+    bl_count[7]++;
+  }
+  while (n <= 287) {
+    static_ltree[n * 2 + 1]/*.Len*/ = 8;
+    n++;
+    bl_count[8]++;
+  }
+  /* Codes 286 and 287 do not exist, but we must include them in the
+   * tree construction to get a canonical Huffman tree (longest code
+   * all ones)
+   */
+  gen_codes(static_ltree, L_CODES + 1, bl_count);
+
+  /* The static distance tree is trivial: */
+  for (n = 0; n < D_CODES; n++) {
+    static_dtree[n * 2 + 1]/*.Len*/ = 5;
+    static_dtree[n * 2]/*.Code*/ = bi_reverse(n, 5);
+  }
+
+  // Now data ready and we can init static trees
+  static_l_desc = new StaticTreeDesc(static_ltree, extra_lbits, LITERALS + 1, L_CODES, MAX_BITS);
+  static_d_desc = new StaticTreeDesc(static_dtree, extra_dbits, 0,          D_CODES, MAX_BITS);
+  static_bl_desc = new StaticTreeDesc(new Array(0), extra_blbits, 0,         BL_CODES, MAX_BL_BITS);
+
+  //static_init_done = true;
+}
+
+
+/* ===========================================================================
+ * Initialize a new block.
+ */
+function init_block(s) {
+  var n; /* iterates over tree elements */
+
+  /* Initialize the trees. */
+  for (n = 0; n < L_CODES;  n++) { s.dyn_ltree[n * 2]/*.Freq*/ = 0; }
+  for (n = 0; n < D_CODES;  n++) { s.dyn_dtree[n * 2]/*.Freq*/ = 0; }
+  for (n = 0; n < BL_CODES; n++) { s.bl_tree[n * 2]/*.Freq*/ = 0; }
+
+  s.dyn_ltree[END_BLOCK * 2]/*.Freq*/ = 1;
+  s.opt_len = s.static_len = 0;
+  s.last_lit = s.matches = 0;
+}
+
+
+/* ===========================================================================
+ * Flush the bit buffer and align the output on a byte boundary
+ */
+function bi_windup(s)
+{
+  if (s.bi_valid > 8) {
+    put_short(s, s.bi_buf);
+  } else if (s.bi_valid > 0) {
+    //put_byte(s, (Byte)s->bi_buf);
+    s.pending_buf[s.pending++] = s.bi_buf;
+  }
+  s.bi_buf = 0;
+  s.bi_valid = 0;
+}
+
+/* ===========================================================================
+ * Copy a stored block, storing first the length and its
+ * one's complement if requested.
+ */
+function copy_block(s, buf, len, header)
+//DeflateState *s;
+//charf    *buf;    /* the input data */
+//unsigned len;     /* its length */
+//int      header;  /* true if block header must be written */
+{
+  bi_windup(s);        /* align on byte boundary */
+
+  if (header) {
+    put_short(s, len);
+    put_short(s, ~len);
+  }
+//  while (len--) {
+//    put_byte(s, *buf++);
+//  }
+  utils.arraySet(s.pending_buf, s.window, buf, len, s.pending);
+  s.pending += len;
+}
+
+/* ===========================================================================
+ * Compares to subtrees, using the tree depth as tie breaker when
+ * the subtrees have equal frequency. This minimizes the worst case length.
+ */
+function smaller(tree, n, m, depth) {
+  var _n2 = n * 2;
+  var _m2 = m * 2;
+  return (tree[_n2]/*.Freq*/ < tree[_m2]/*.Freq*/ ||
+         (tree[_n2]/*.Freq*/ === tree[_m2]/*.Freq*/ && depth[n] <= depth[m]));
+}
+
+/* ===========================================================================
+ * Restore the heap property by moving down the tree starting at node k,
+ * exchanging a node with the smallest of its two sons if necessary, stopping
+ * when the heap property is re-established (each father smaller than its
+ * two sons).
+ */
+function pqdownheap(s, tree, k)
+//    deflate_state *s;
+//    ct_data *tree;  /* the tree to restore */
+//    int k;               /* node to move down */
+{
+  var v = s.heap[k];
+  var j = k << 1;  /* left son of k */
+  while (j <= s.heap_len) {
+    /* Set j to the smallest of the two sons: */
+    if (j < s.heap_len &&
+      smaller(tree, s.heap[j + 1], s.heap[j], s.depth)) {
+      j++;
+    }
+    /* Exit if v is smaller than both sons */
+    if (smaller(tree, v, s.heap[j], s.depth)) { break; }
+
+    /* Exchange v with the smallest son */
+    s.heap[k] = s.heap[j];
+    k = j;
+
+    /* And continue down the tree, setting j to the left son of k */
+    j <<= 1;
+  }
+  s.heap[k] = v;
+}
+
+
+// inlined manually
+// var SMALLEST = 1;
+
+/* ===========================================================================
+ * Send the block data compressed using the given Huffman trees
+ */
+function compress_block(s, ltree, dtree)
+//    deflate_state *s;
+//    const ct_data *ltree; /* literal tree */
+//    const ct_data *dtree; /* distance tree */
+{
+  var dist;           /* distance of matched string */
+  var lc;             /* match length or unmatched char (if dist == 0) */
+  var lx = 0;         /* running index in l_buf */
+  var code;           /* the code to send */
+  var extra;          /* number of extra bits to send */
+
+  if (s.last_lit !== 0) {
+    do {
+      dist = (s.pending_buf[s.d_buf + lx * 2] << 8) | (s.pending_buf[s.d_buf + lx * 2 + 1]);
+      lc = s.pending_buf[s.l_buf + lx];
+      lx++;
+
+      if (dist === 0) {
+        send_code(s, lc, ltree); /* send a literal byte */
+        //Tracecv(isgraph(lc), (stderr," '%c' ", lc));
+      } else {
+        /* Here, lc is the match length - MIN_MATCH */
+        code = _length_code[lc];
+        send_code(s, code + LITERALS + 1, ltree); /* send the length code */
+        extra = extra_lbits[code];
+        if (extra !== 0) {
+          lc -= base_length[code];
+          send_bits(s, lc, extra);       /* send the extra length bits */
+        }
+        dist--; /* dist is now the match distance - 1 */
+        code = d_code(dist);
+        //Assert (code < D_CODES, "bad d_code");
+
+        send_code(s, code, dtree);       /* send the distance code */
+        extra = extra_dbits[code];
+        if (extra !== 0) {
+          dist -= base_dist[code];
+          send_bits(s, dist, extra);   /* send the extra distance bits */
+        }
+      } /* literal or match pair ? */
+
+      /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
+      //Assert((uInt)(s->pending) < s->lit_bufsize + 2*lx,
+      //       "pendingBuf overflow");
+
+    } while (lx < s.last_lit);
+  }
+
+  send_code(s, END_BLOCK, ltree);
+}
+
+
+/* ===========================================================================
+ * Construct one Huffman tree and assigns the code bit strings and lengths.
+ * Update the total bit length for the current block.
+ * IN assertion: the field freq is set for all tree elements.
+ * OUT assertions: the fields len and code are set to the optimal bit length
+ *     and corresponding code. The length opt_len is updated; static_len is
+ *     also updated if stree is not null. The field max_code is set.
+ */
+function build_tree(s, desc)
+//    deflate_state *s;
+//    tree_desc *desc; /* the tree descriptor */
+{
+  var tree     = desc.dyn_tree;
+  var stree    = desc.stat_desc.static_tree;
+  var has_stree = desc.stat_desc.has_stree;
+  var elems    = desc.stat_desc.elems;
+  var n, m;          /* iterate over heap elements */
+  var max_code = -1; /* largest code with non zero frequency */
+  var node;          /* new node being created */
+
+  /* Construct the initial heap, with least frequent element in
+   * heap[SMALLEST]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
+   * heap[0] is not used.
+   */
+  s.heap_len = 0;
+  s.heap_max = HEAP_SIZE;
+
+  for (n = 0; n < elems; n++) {
+    if (tree[n * 2]/*.Freq*/ !== 0) {
+      s.heap[++s.heap_len] = max_code = n;
+      s.depth[n] = 0;
+
+    } else {
+      tree[n * 2 + 1]/*.Len*/ = 0;
+    }
+  }
+
+  /* The pkzip format requires that at least one distance code exists,
+   * and that at least one bit should be sent even if there is only one
+   * possible code. So to avoid special checks later on we force at least
+   * two codes of non zero frequency.
+   */
+  while (s.heap_len < 2) {
+    node = s.heap[++s.heap_len] = (max_code < 2 ? ++max_code : 0);
+    tree[node * 2]/*.Freq*/ = 1;
+    s.depth[node] = 0;
+    s.opt_len--;
+
+    if (has_stree) {
+      s.static_len -= stree[node * 2 + 1]/*.Len*/;
+    }
+    /* node is 0 or 1 so it does not have extra bits */
+  }
+  desc.max_code = max_code;
+
+  /* The elements heap[heap_len/2+1 .. heap_len] are leaves of the tree,
+   * establish sub-heaps of increasing lengths:
+   */
+  for (n = (s.heap_len >> 1/*int /2*/); n >= 1; n--) { pqdownheap(s, tree, n); }
+
+  /* Construct the Huffman tree by repeatedly combining the least two
+   * frequent nodes.
+   */
+  node = elems;              /* next internal node of the tree */
+  do {
+    //pqremove(s, tree, n);  /* n = node of least frequency */
+    /*** pqremove ***/
+    n = s.heap[1/*SMALLEST*/];
+    s.heap[1/*SMALLEST*/] = s.heap[s.heap_len--];
+    pqdownheap(s, tree, 1/*SMALLEST*/);
+    /***/
+
+    m = s.heap[1/*SMALLEST*/]; /* m = node of next least frequency */
+
+    s.heap[--s.heap_max] = n; /* keep the nodes sorted by frequency */
+    s.heap[--s.heap_max] = m;
+
+    /* Create a new node father of n and m */
+    tree[node * 2]/*.Freq*/ = tree[n * 2]/*.Freq*/ + tree[m * 2]/*.Freq*/;
+    s.depth[node] = (s.depth[n] >= s.depth[m] ? s.depth[n] : s.depth[m]) + 1;
+    tree[n * 2 + 1]/*.Dad*/ = tree[m * 2 + 1]/*.Dad*/ = node;
+
+    /* and insert the new node in the heap */
+    s.heap[1/*SMALLEST*/] = node++;
+    pqdownheap(s, tree, 1/*SMALLEST*/);
+
+  } while (s.heap_len >= 2);
+
+  s.heap[--s.heap_max] = s.heap[1/*SMALLEST*/];
+
+  /* At this point, the fields freq and dad are set. We can now
+   * generate the bit lengths.
+   */
+  gen_bitlen(s, desc);
+
+  /* The field len is now set, we can generate the bit codes */
+  gen_codes(tree, max_code, s.bl_count);
+}
+
+
+/* ===========================================================================
+ * Scan a literal or distance tree to determine the frequencies of the codes
+ * in the bit length tree.
+ */
+function scan_tree(s, tree, max_code)
+//    deflate_state *s;
+//    ct_data *tree;   /* the tree to be scanned */
+//    int max_code;    /* and its largest code of non zero frequency */
+{
+  var n;                     /* iterates over all tree elements */
+  var prevlen = -1;          /* last emitted length */
+  var curlen;                /* length of current code */
+
+  var nextlen = tree[0 * 2 + 1]/*.Len*/; /* length of next code */
+
+  var count = 0;             /* repeat count of the current code */
+  var max_count = 7;         /* max repeat count */
+  var min_count = 4;         /* min repeat count */
+
+  if (nextlen === 0) {
+    max_count = 138;
+    min_count = 3;
+  }
+  tree[(max_code + 1) * 2 + 1]/*.Len*/ = 0xffff; /* guard */
+
+  for (n = 0; n <= max_code; n++) {
+    curlen = nextlen;
+    nextlen = tree[(n + 1) * 2 + 1]/*.Len*/;
+
+    if (++count < max_count && curlen === nextlen) {
+      continue;
+
+    } else if (count < min_count) {
+      s.bl_tree[curlen * 2]/*.Freq*/ += count;
+
+    } else if (curlen !== 0) {
+
+      if (curlen !== prevlen) { s.bl_tree[curlen * 2]/*.Freq*/++; }
+      s.bl_tree[REP_3_6 * 2]/*.Freq*/++;
+
+    } else if (count <= 10) {
+      s.bl_tree[REPZ_3_10 * 2]/*.Freq*/++;
+
+    } else {
+      s.bl_tree[REPZ_11_138 * 2]/*.Freq*/++;
+    }
+
+    count = 0;
+    prevlen = curlen;
+
+    if (nextlen === 0) {
+      max_count = 138;
+      min_count = 3;
+
+    } else if (curlen === nextlen) {
+      max_count = 6;
+      min_count = 3;
+
+    } else {
+      max_count = 7;
+      min_count = 4;
+    }
+  }
+}
+
+
+/* ===========================================================================
+ * Send a literal or distance tree in compressed form, using the codes in
+ * bl_tree.
+ */
+function send_tree(s, tree, max_code)
+//    deflate_state *s;
+//    ct_data *tree; /* the tree to be scanned */
+//    int max_code;       /* and its largest code of non zero frequency */
+{
+  var n;                     /* iterates over all tree elements */
+  var prevlen = -1;          /* last emitted length */
+  var curlen;                /* length of current code */
+
+  var nextlen = tree[0 * 2 + 1]/*.Len*/; /* length of next code */
+
+  var count = 0;             /* repeat count of the current code */
+  var max_count = 7;         /* max repeat count */
+  var min_count = 4;         /* min repeat count */
+
+  /* tree[max_code+1].Len = -1; */  /* guard already set */
+  if (nextlen === 0) {
+    max_count = 138;
+    min_count = 3;
+  }
+
+  for (n = 0; n <= max_code; n++) {
+    curlen = nextlen;
+    nextlen = tree[(n + 1) * 2 + 1]/*.Len*/;
+
+    if (++count < max_count && curlen === nextlen) {
+      continue;
+
+    } else if (count < min_count) {
+      do { send_code(s, curlen, s.bl_tree); } while (--count !== 0);
+
+    } else if (curlen !== 0) {
+      if (curlen !== prevlen) {
+        send_code(s, curlen, s.bl_tree);
+        count--;
+      }
+      //Assert(count >= 3 && count <= 6, " 3_6?");
+      send_code(s, REP_3_6, s.bl_tree);
+      send_bits(s, count - 3, 2);
+
+    } else if (count <= 10) {
+      send_code(s, REPZ_3_10, s.bl_tree);
+      send_bits(s, count - 3, 3);
+
+    } else {
+      send_code(s, REPZ_11_138, s.bl_tree);
+      send_bits(s, count - 11, 7);
+    }
+
+    count = 0;
+    prevlen = curlen;
+    if (nextlen === 0) {
+      max_count = 138;
+      min_count = 3;
+
+    } else if (curlen === nextlen) {
+      max_count = 6;
+      min_count = 3;
+
+    } else {
+      max_count = 7;
+      min_count = 4;
+    }
+  }
+}
+
+
+/* ===========================================================================
+ * Construct the Huffman tree for the bit lengths and return the index in
+ * bl_order of the last bit length code to send.
+ */
+function build_bl_tree(s) {
+  var max_blindex;  /* index of last bit length code of non zero freq */
+
+  /* Determine the bit length frequencies for literal and distance trees */
+  scan_tree(s, s.dyn_ltree, s.l_desc.max_code);
+  scan_tree(s, s.dyn_dtree, s.d_desc.max_code);
+
+  /* Build the bit length tree: */
+  build_tree(s, s.bl_desc);
+  /* opt_len now includes the length of the tree representations, except
+   * the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
+   */
+
+  /* Determine the number of bit length codes to send. The pkzip format
+   * requires that at least 4 bit length codes be sent. (appnote.txt says
+   * 3 but the actual value used is 4.)
+   */
+  for (max_blindex = BL_CODES - 1; max_blindex >= 3; max_blindex--) {
+    if (s.bl_tree[bl_order[max_blindex] * 2 + 1]/*.Len*/ !== 0) {
+      break;
+    }
+  }
+  /* Update opt_len to include the bit length tree and counts */
+  s.opt_len += 3 * (max_blindex + 1) + 5 + 5 + 4;
+  //Tracev((stderr, "\ndyn trees: dyn %ld, stat %ld",
+  //        s->opt_len, s->static_len));
+
+  return max_blindex;
+}
+
+
+/* ===========================================================================
+ * Send the header for a block using dynamic Huffman trees: the counts, the
+ * lengths of the bit length codes, the literal tree and the distance tree.
+ * IN assertion: lcodes >= 257, dcodes >= 1, blcodes >= 4.
+ */
+function send_all_trees(s, lcodes, dcodes, blcodes)
+//    deflate_state *s;
+//    int lcodes, dcodes, blcodes; /* number of codes for each tree */
+{
+  var rank;                    /* index in bl_order */
+
+  //Assert (lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
+  //Assert (lcodes <= L_CODES && dcodes <= D_CODES && blcodes <= BL_CODES,
+  //        "too many codes");
+  //Tracev((stderr, "\nbl counts: "));
+  send_bits(s, lcodes - 257, 5); /* not +255 as stated in appnote.txt */
+  send_bits(s, dcodes - 1,   5);
+  send_bits(s, blcodes - 4,  4); /* not -3 as stated in appnote.txt */
+  for (rank = 0; rank < blcodes; rank++) {
+    //Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
+    send_bits(s, s.bl_tree[bl_order[rank] * 2 + 1]/*.Len*/, 3);
+  }
+  //Tracev((stderr, "\nbl tree: sent %ld", s->bits_sent));
+
+  send_tree(s, s.dyn_ltree, lcodes - 1); /* literal tree */
+  //Tracev((stderr, "\nlit tree: sent %ld", s->bits_sent));
+
+  send_tree(s, s.dyn_dtree, dcodes - 1); /* distance tree */
+  //Tracev((stderr, "\ndist tree: sent %ld", s->bits_sent));
+}
+
+
+/* ===========================================================================
+ * Check if the data type is TEXT or BINARY, using the following algorithm:
+ * - TEXT if the two conditions below are satisfied:
+ *    a) There are no non-portable control characters belonging to the
+ *       "black list" (0..6, 14..25, 28..31).
+ *    b) There is at least one printable character belonging to the
+ *       "white list" (9 {TAB}, 10 {LF}, 13 {CR}, 32..255).
+ * - BINARY otherwise.
+ * - The following partially-portable control characters form a
+ *   "gray list" that is ignored in this detection algorithm:
+ *   (7 {BEL}, 8 {BS}, 11 {VT}, 12 {FF}, 26 {SUB}, 27 {ESC}).
+ * IN assertion: the fields Freq of dyn_ltree are set.
+ */
+function detect_data_type(s) {
+  /* black_mask is the bit mask of black-listed bytes
+   * set bits 0..6, 14..25, and 28..31
+   * 0xf3ffc07f = binary 11110011111111111100000001111111
+   */
+  var black_mask = 0xf3ffc07f;
+  var n;
+
+  /* Check for non-textual ("black-listed") bytes. */
+  for (n = 0; n <= 31; n++, black_mask >>>= 1) {
+    if ((black_mask & 1) && (s.dyn_ltree[n * 2]/*.Freq*/ !== 0)) {
+      return Z_BINARY;
+    }
+  }
+
+  /* Check for textual ("white-listed") bytes. */
+  if (s.dyn_ltree[9 * 2]/*.Freq*/ !== 0 || s.dyn_ltree[10 * 2]/*.Freq*/ !== 0 ||
+      s.dyn_ltree[13 * 2]/*.Freq*/ !== 0) {
+    return Z_TEXT;
+  }
+  for (n = 32; n < LITERALS; n++) {
+    if (s.dyn_ltree[n * 2]/*.Freq*/ !== 0) {
+      return Z_TEXT;
+    }
+  }
+
+  /* There are no "black-listed" or "white-listed" bytes:
+   * this stream either is empty or has tolerated ("gray-listed") bytes only.
+   */
+  return Z_BINARY;
+}
+
+
+var static_init_done = false;
+
+/* ===========================================================================
+ * Initialize the tree data structures for a new zlib stream.
+ */
+function _tr_init(s)
+{
+
+  if (!static_init_done) {
+    tr_static_init();
+    static_init_done = true;
+  }
+
+  s.l_desc  = new TreeDesc(s.dyn_ltree, static_l_desc);
+  s.d_desc  = new TreeDesc(s.dyn_dtree, static_d_desc);
+  s.bl_desc = new TreeDesc(s.bl_tree, static_bl_desc);
+
+  s.bi_buf = 0;
+  s.bi_valid = 0;
+
+  /* Initialize the first block of the first file: */
+  init_block(s);
+}
+
+
+/* ===========================================================================
+ * Send a stored block
+ */
+function _tr_stored_block(s, buf, stored_len, last)
+//DeflateState *s;
+//charf *buf;       /* input block */
+//ulg stored_len;   /* length of input block */
+//int last;         /* one if this is the last block for a file */
+{
+  send_bits(s, (STORED_BLOCK << 1) + (last ? 1 : 0), 3);    /* send block type */
+  copy_block(s, buf, stored_len, true); /* with header */
+}
+
+
+/* ===========================================================================
+ * Send one empty static block to give enough lookahead for inflate.
+ * This takes 10 bits, of which 7 may remain in the bit buffer.
+ */
+function _tr_align(s) {
+  send_bits(s, STATIC_TREES << 1, 3);
+  send_code(s, END_BLOCK, static_ltree);
+  bi_flush(s);
+}
+
+
+/* ===========================================================================
+ * Determine the best encoding for the current block: dynamic trees, static
+ * trees or store, and output the encoded block to the zip file.
+ */
+function _tr_flush_block(s, buf, stored_len, last)
+//DeflateState *s;
+//charf *buf;       /* input block, or NULL if too old */
+//ulg stored_len;   /* length of input block */
+//int last;         /* one if this is the last block for a file */
+{
+  var opt_lenb, static_lenb;  /* opt_len and static_len in bytes */
+  var max_blindex = 0;        /* index of last bit length code of non zero freq */
+
+  /* Build the Huffman trees unless a stored block is forced */
+  if (s.level > 0) {
+
+    /* Check if the file is binary or text */
+    if (s.strm.data_type === Z_UNKNOWN) {
+      s.strm.data_type = detect_data_type(s);
+    }
+
+    /* Construct the literal and distance trees */
+    build_tree(s, s.l_desc);
+    // Tracev((stderr, "\nlit data: dyn %ld, stat %ld", s->opt_len,
+    //        s->static_len));
+
+    build_tree(s, s.d_desc);
+    // Tracev((stderr, "\ndist data: dyn %ld, stat %ld", s->opt_len,
+    //        s->static_len));
+    /* At this point, opt_len and static_len are the total bit lengths of
+     * the compressed block data, excluding the tree representations.
+     */
+
+    /* Build the bit length tree for the above two trees, and get the index
+     * in bl_order of the last bit length code to send.
+     */
+    max_blindex = build_bl_tree(s);
+
+    /* Determine the best encoding. Compute the block lengths in bytes. */
+    opt_lenb = (s.opt_len + 3 + 7) >>> 3;
+    static_lenb = (s.static_len + 3 + 7) >>> 3;
+
+    // Tracev((stderr, "\nopt %lu(%lu) stat %lu(%lu) stored %lu lit %u ",
+    //        opt_lenb, s->opt_len, static_lenb, s->static_len, stored_len,
+    //        s->last_lit));
+
+    if (static_lenb <= opt_lenb) { opt_lenb = static_lenb; }
+
+  } else {
+    // Assert(buf != (char*)0, "lost buf");
+    opt_lenb = static_lenb = stored_len + 5; /* force a stored block */
+  }
+
+  if ((stored_len + 4 <= opt_lenb) && (buf !== -1)) {
+    /* 4: two words for the lengths */
+
+    /* The test buf != NULL is only necessary if LIT_BUFSIZE > WSIZE.
+     * Otherwise we can't have processed more than WSIZE input bytes since
+     * the last block flush, because compression would have been
+     * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
+     * transform a block into a stored block.
+     */
+    _tr_stored_block(s, buf, stored_len, last);
+
+  } else if (s.strategy === Z_FIXED || static_lenb === opt_lenb) {
+
+    send_bits(s, (STATIC_TREES << 1) + (last ? 1 : 0), 3);
+    compress_block(s, static_ltree, static_dtree);
+
+  } else {
+    send_bits(s, (DYN_TREES << 1) + (last ? 1 : 0), 3);
+    send_all_trees(s, s.l_desc.max_code + 1, s.d_desc.max_code + 1, max_blindex + 1);
+    compress_block(s, s.dyn_ltree, s.dyn_dtree);
+  }
+  // Assert (s->compressed_len == s->bits_sent, "bad compressed size");
+  /* The above check is made mod 2^32, for files larger than 512 MB
+   * and uLong implemented on 32 bits.
+   */
+  init_block(s);
+
+  if (last) {
+    bi_windup(s);
+  }
+  // Tracev((stderr,"\ncomprlen %lu(%lu) ", s->compressed_len>>3,
+  //       s->compressed_len-7*last));
+}
+
+/* ===========================================================================
+ * Save the match info and tally the frequency counts. Return true if
+ * the current block must be flushed.
+ */
+function _tr_tally(s, dist, lc)
+//    deflate_state *s;
+//    unsigned dist;  /* distance of matched string */
+//    unsigned lc;    /* match length-MIN_MATCH or unmatched char (if dist==0) */
+{
+  //var out_length, in_length, dcode;
+
+  s.pending_buf[s.d_buf + s.last_lit * 2]     = (dist >>> 8) & 0xff;
+  s.pending_buf[s.d_buf + s.last_lit * 2 + 1] = dist & 0xff;
+
+  s.pending_buf[s.l_buf + s.last_lit] = lc & 0xff;
+  s.last_lit++;
+
+  if (dist === 0) {
+    /* lc is the unmatched char */
+    s.dyn_ltree[lc * 2]/*.Freq*/++;
+  } else {
+    s.matches++;
+    /* Here, lc is the match length - MIN_MATCH */
+    dist--;             /* dist = match distance - 1 */
+    //Assert((ush)dist < (ush)MAX_DIST(s) &&
+    //       (ush)lc <= (ush)(MAX_MATCH-MIN_MATCH) &&
+    //       (ush)d_code(dist) < (ush)D_CODES,  "_tr_tally: bad match");
+
+    s.dyn_ltree[(_length_code[lc] + LITERALS + 1) * 2]/*.Freq*/++;
+    s.dyn_dtree[d_code(dist) * 2]/*.Freq*/++;
+  }
+
+// (!) This block is disabled in zlib defaults,
+// don't enable it for binary compatibility
+
+//#ifdef TRUNCATE_BLOCK
+//  /* Try to guess if it is profitable to stop the current block here */
+//  if ((s.last_lit & 0x1fff) === 0 && s.level > 2) {
+//    /* Compute an upper bound for the compressed length */
+//    out_length = s.last_lit*8;
+//    in_length = s.strstart - s.block_start;
+//
+//    for (dcode = 0; dcode < D_CODES; dcode++) {
+//      out_length += s.dyn_dtree[dcode*2]/*.Freq*/ * (5 + extra_dbits[dcode]);
+//    }
+//    out_length >>>= 3;
+//    //Tracev((stderr,"\nlast_lit %u, in %ld, out ~%ld(%ld%%) ",
+//    //       s->last_lit, in_length, out_length,
+//    //       100L - out_length*100L/in_length));
+//    if (s.matches < (s.last_lit>>1)/*int /2*/ && out_length < (in_length>>1)/*int /2*/) {
+//      return true;
+//    }
+//  }
+//#endif
+
+  return (s.last_lit === s.lit_bufsize - 1);
+  /* We avoid equality with lit_bufsize because of wraparound at 64K
+   * on 16 bit machines and because stored blocks are restricted to
+   * 64K-1 bytes.
+   */
+}
+
+exports._tr_init  = _tr_init;
+exports._tr_stored_block = _tr_stored_block;
+exports._tr_flush_block  = _tr_flush_block;
+exports._tr_tally = _tr_tally;
+exports._tr_align = _tr_align;
 
 
 /***/ }),
-/* 787 */,
-/* 788 */
+
+/***/ 788:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -33897,10 +26423,8 @@ PassThrough.prototype._transform = function (chunk, encoding, cb) {
 };
 
 /***/ }),
-/* 789 */,
-/* 790 */,
-/* 791 */,
-/* 792 */
+
+/***/ 792:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -33947,7 +26471,8 @@ module.exports = {
 
 
 /***/ }),
-/* 793 */
+
+/***/ 793:
 /***/ (function(__unusedmodule, __unusedexports, __webpack_require__) {
 
 const path = __webpack_require__(622)
@@ -34022,8 +26547,8 @@ run()
 
 
 /***/ }),
-/* 794 */,
-/* 795 */
+
+/***/ 795:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -34146,549 +26671,16 @@ module.exports = DataWorker;
 
 
 /***/ }),
-/* 796 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const compare = __webpack_require__(233)
-const neq = (a, b, loose) => compare(a, b, loose) !== 0
-module.exports = neq
-
-
-/***/ }),
-/* 797 */,
-/* 798 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-/* MIT license */
-var colorNames = __webpack_require__(630);
-var swizzle = __webpack_require__(628);
-
-var reverseNames = {};
-
-// create a list of reverse color names
-for (var name in colorNames) {
-	if (colorNames.hasOwnProperty(name)) {
-		reverseNames[colorNames[name]] = name;
-	}
-}
-
-var cs = module.exports = {
-	to: {},
-	get: {}
-};
-
-cs.get = function (string) {
-	var prefix = string.substring(0, 3).toLowerCase();
-	var val;
-	var model;
-	switch (prefix) {
-		case 'hsl':
-			val = cs.get.hsl(string);
-			model = 'hsl';
-			break;
-		case 'hwb':
-			val = cs.get.hwb(string);
-			model = 'hwb';
-			break;
-		default:
-			val = cs.get.rgb(string);
-			model = 'rgb';
-			break;
-	}
-
-	if (!val) {
-		return null;
-	}
-
-	return {model: model, value: val};
-};
-
-cs.get.rgb = function (string) {
-	if (!string) {
-		return null;
-	}
-
-	var abbr = /^#([a-f0-9]{3,4})$/i;
-	var hex = /^#([a-f0-9]{6})([a-f0-9]{2})?$/i;
-	var rgba = /^rgba?\(\s*([+-]?\d+)\s*,\s*([+-]?\d+)\s*,\s*([+-]?\d+)\s*(?:,\s*([+-]?[\d\.]+)\s*)?\)$/;
-	var per = /^rgba?\(\s*([+-]?[\d\.]+)\%\s*,\s*([+-]?[\d\.]+)\%\s*,\s*([+-]?[\d\.]+)\%\s*(?:,\s*([+-]?[\d\.]+)\s*)?\)$/;
-	var keyword = /(\D+)/;
-
-	var rgb = [0, 0, 0, 1];
-	var match;
-	var i;
-	var hexAlpha;
-
-	if (match = string.match(hex)) {
-		hexAlpha = match[2];
-		match = match[1];
-
-		for (i = 0; i < 3; i++) {
-			// https://jsperf.com/slice-vs-substr-vs-substring-methods-long-string/19
-			var i2 = i * 2;
-			rgb[i] = parseInt(match.slice(i2, i2 + 2), 16);
-		}
-
-		if (hexAlpha) {
-			rgb[3] = parseInt(hexAlpha, 16) / 255;
-		}
-	} else if (match = string.match(abbr)) {
-		match = match[1];
-		hexAlpha = match[3];
-
-		for (i = 0; i < 3; i++) {
-			rgb[i] = parseInt(match[i] + match[i], 16);
-		}
-
-		if (hexAlpha) {
-			rgb[3] = parseInt(hexAlpha + hexAlpha, 16) / 255;
-		}
-	} else if (match = string.match(rgba)) {
-		for (i = 0; i < 3; i++) {
-			rgb[i] = parseInt(match[i + 1], 0);
-		}
-
-		if (match[4]) {
-			rgb[3] = parseFloat(match[4]);
-		}
-	} else if (match = string.match(per)) {
-		for (i = 0; i < 3; i++) {
-			rgb[i] = Math.round(parseFloat(match[i + 1]) * 2.55);
-		}
-
-		if (match[4]) {
-			rgb[3] = parseFloat(match[4]);
-		}
-	} else if (match = string.match(keyword)) {
-		if (match[1] === 'transparent') {
-			return [0, 0, 0, 0];
-		}
-
-		rgb = colorNames[match[1]];
-
-		if (!rgb) {
-			return null;
-		}
-
-		rgb[3] = 1;
-
-		return rgb;
-	} else {
-		return null;
-	}
-
-	for (i = 0; i < 3; i++) {
-		rgb[i] = clamp(rgb[i], 0, 255);
-	}
-	rgb[3] = clamp(rgb[3], 0, 1);
-
-	return rgb;
-};
-
-cs.get.hsl = function (string) {
-	if (!string) {
-		return null;
-	}
-
-	var hsl = /^hsla?\(\s*([+-]?(?:\d{0,3}\.)?\d+)(?:deg)?\s*,\s*([+-]?[\d\.]+)%\s*,\s*([+-]?[\d\.]+)%\s*(?:,\s*([+-]?[\d\.]+)\s*)?\)$/;
-	var match = string.match(hsl);
-
-	if (match) {
-		var alpha = parseFloat(match[4]);
-		var h = (parseFloat(match[1]) + 360) % 360;
-		var s = clamp(parseFloat(match[2]), 0, 100);
-		var l = clamp(parseFloat(match[3]), 0, 100);
-		var a = clamp(isNaN(alpha) ? 1 : alpha, 0, 1);
-
-		return [h, s, l, a];
-	}
-
-	return null;
-};
-
-cs.get.hwb = function (string) {
-	if (!string) {
-		return null;
-	}
-
-	var hwb = /^hwb\(\s*([+-]?\d{0,3}(?:\.\d+)?)(?:deg)?\s*,\s*([+-]?[\d\.]+)%\s*,\s*([+-]?[\d\.]+)%\s*(?:,\s*([+-]?[\d\.]+)\s*)?\)$/;
-	var match = string.match(hwb);
-
-	if (match) {
-		var alpha = parseFloat(match[4]);
-		var h = ((parseFloat(match[1]) % 360) + 360) % 360;
-		var w = clamp(parseFloat(match[2]), 0, 100);
-		var b = clamp(parseFloat(match[3]), 0, 100);
-		var a = clamp(isNaN(alpha) ? 1 : alpha, 0, 1);
-		return [h, w, b, a];
-	}
-
-	return null;
-};
-
-cs.to.hex = function () {
-	var rgba = swizzle(arguments);
-
-	return (
-		'#' +
-		hexDouble(rgba[0]) +
-		hexDouble(rgba[1]) +
-		hexDouble(rgba[2]) +
-		(rgba[3] < 1
-			? (hexDouble(Math.round(rgba[3] * 255)))
-			: '')
-	);
-};
-
-cs.to.rgb = function () {
-	var rgba = swizzle(arguments);
-
-	return rgba.length < 4 || rgba[3] === 1
-		? 'rgb(' + Math.round(rgba[0]) + ', ' + Math.round(rgba[1]) + ', ' + Math.round(rgba[2]) + ')'
-		: 'rgba(' + Math.round(rgba[0]) + ', ' + Math.round(rgba[1]) + ', ' + Math.round(rgba[2]) + ', ' + rgba[3] + ')';
-};
-
-cs.to.rgb.percent = function () {
-	var rgba = swizzle(arguments);
-
-	var r = Math.round(rgba[0] / 255 * 100);
-	var g = Math.round(rgba[1] / 255 * 100);
-	var b = Math.round(rgba[2] / 255 * 100);
-
-	return rgba.length < 4 || rgba[3] === 1
-		? 'rgb(' + r + '%, ' + g + '%, ' + b + '%)'
-		: 'rgba(' + r + '%, ' + g + '%, ' + b + '%, ' + rgba[3] + ')';
-};
-
-cs.to.hsl = function () {
-	var hsla = swizzle(arguments);
-	return hsla.length < 4 || hsla[3] === 1
-		? 'hsl(' + hsla[0] + ', ' + hsla[1] + '%, ' + hsla[2] + '%)'
-		: 'hsla(' + hsla[0] + ', ' + hsla[1] + '%, ' + hsla[2] + '%, ' + hsla[3] + ')';
-};
-
-// hwb is a bit different than rgb(a) & hsl(a) since there is no alpha specific syntax
-// (hwb have alpha optional & 1 is default value)
-cs.to.hwb = function () {
-	var hwba = swizzle(arguments);
-
-	var a = '';
-	if (hwba.length >= 4 && hwba[3] !== 1) {
-		a = ', ' + hwba[3];
-	}
-
-	return 'hwb(' + hwba[0] + ', ' + hwba[1] + '%, ' + hwba[2] + '%' + a + ')';
-};
-
-cs.to.keyword = function (rgb) {
-	return reverseNames[rgb.slice(0, 3)];
-};
-
-// helpers
-function clamp(num, min, max) {
-	return Math.min(Math.max(min, num), max);
-}
-
-function hexDouble(num) {
-	var str = num.toString(16).toUpperCase();
-	return (str.length < 2) ? '0' + str : str;
-}
-
-
-/***/ }),
-/* 799 */,
-/* 800 */,
-/* 801 */,
-/* 802 */,
-/* 803 */,
-/* 804 */,
-/* 805 */,
-/* 806 */,
-/* 807 */,
-/* 808 */,
-/* 809 */,
-/* 810 */,
-/* 811 */
+/***/ 811:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 module.exports = __webpack_require__(413);
 
 
 /***/ }),
-/* 812 */,
-/* 813 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-
-var readerFor = __webpack_require__(298);
-var utils = __webpack_require__(901);
-var sig = __webpack_require__(28);
-var ZipEntry = __webpack_require__(772);
-var utf8 = __webpack_require__(341);
-var support = __webpack_require__(188);
-//  class ZipEntries {{{
-/**
- * All the entries in the zip file.
- * @constructor
- * @param {Object} loadOptions Options for loading the stream.
- */
-function ZipEntries(loadOptions) {
-    this.files = [];
-    this.loadOptions = loadOptions;
-}
-ZipEntries.prototype = {
-    /**
-     * Check that the reader is on the specified signature.
-     * @param {string} expectedSignature the expected signature.
-     * @throws {Error} if it is an other signature.
-     */
-    checkSignature: function(expectedSignature) {
-        if (!this.reader.readAndCheckSignature(expectedSignature)) {
-            this.reader.index -= 4;
-            var signature = this.reader.readString(4);
-            throw new Error("Corrupted zip or bug: unexpected signature " + "(" + utils.pretty(signature) + ", expected " + utils.pretty(expectedSignature) + ")");
-        }
-    },
-    /**
-     * Check if the given signature is at the given index.
-     * @param {number} askedIndex the index to check.
-     * @param {string} expectedSignature the signature to expect.
-     * @return {boolean} true if the signature is here, false otherwise.
-     */
-    isSignature: function(askedIndex, expectedSignature) {
-        var currentIndex = this.reader.index;
-        this.reader.setIndex(askedIndex);
-        var signature = this.reader.readString(4);
-        var result = signature === expectedSignature;
-        this.reader.setIndex(currentIndex);
-        return result;
-    },
-    /**
-     * Read the end of the central directory.
-     */
-    readBlockEndOfCentral: function() {
-        this.diskNumber = this.reader.readInt(2);
-        this.diskWithCentralDirStart = this.reader.readInt(2);
-        this.centralDirRecordsOnThisDisk = this.reader.readInt(2);
-        this.centralDirRecords = this.reader.readInt(2);
-        this.centralDirSize = this.reader.readInt(4);
-        this.centralDirOffset = this.reader.readInt(4);
-
-        this.zipCommentLength = this.reader.readInt(2);
-        // warning : the encoding depends of the system locale
-        // On a linux machine with LANG=en_US.utf8, this field is utf8 encoded.
-        // On a windows machine, this field is encoded with the localized windows code page.
-        var zipComment = this.reader.readData(this.zipCommentLength);
-        var decodeParamType = support.uint8array ? "uint8array" : "array";
-        // To get consistent behavior with the generation part, we will assume that
-        // this is utf8 encoded unless specified otherwise.
-        var decodeContent = utils.transformTo(decodeParamType, zipComment);
-        this.zipComment = this.loadOptions.decodeFileName(decodeContent);
-    },
-    /**
-     * Read the end of the Zip 64 central directory.
-     * Not merged with the method readEndOfCentral :
-     * The end of central can coexist with its Zip64 brother,
-     * I don't want to read the wrong number of bytes !
-     */
-    readBlockZip64EndOfCentral: function() {
-        this.zip64EndOfCentralSize = this.reader.readInt(8);
-        this.reader.skip(4);
-        // this.versionMadeBy = this.reader.readString(2);
-        // this.versionNeeded = this.reader.readInt(2);
-        this.diskNumber = this.reader.readInt(4);
-        this.diskWithCentralDirStart = this.reader.readInt(4);
-        this.centralDirRecordsOnThisDisk = this.reader.readInt(8);
-        this.centralDirRecords = this.reader.readInt(8);
-        this.centralDirSize = this.reader.readInt(8);
-        this.centralDirOffset = this.reader.readInt(8);
-
-        this.zip64ExtensibleData = {};
-        var extraDataSize = this.zip64EndOfCentralSize - 44,
-            index = 0,
-            extraFieldId,
-            extraFieldLength,
-            extraFieldValue;
-        while (index < extraDataSize) {
-            extraFieldId = this.reader.readInt(2);
-            extraFieldLength = this.reader.readInt(4);
-            extraFieldValue = this.reader.readData(extraFieldLength);
-            this.zip64ExtensibleData[extraFieldId] = {
-                id: extraFieldId,
-                length: extraFieldLength,
-                value: extraFieldValue
-            };
-        }
-    },
-    /**
-     * Read the end of the Zip 64 central directory locator.
-     */
-    readBlockZip64EndOfCentralLocator: function() {
-        this.diskWithZip64CentralDirStart = this.reader.readInt(4);
-        this.relativeOffsetEndOfZip64CentralDir = this.reader.readInt(8);
-        this.disksCount = this.reader.readInt(4);
-        if (this.disksCount > 1) {
-            throw new Error("Multi-volumes zip are not supported");
-        }
-    },
-    /**
-     * Read the local files, based on the offset read in the central part.
-     */
-    readLocalFiles: function() {
-        var i, file;
-        for (i = 0; i < this.files.length; i++) {
-            file = this.files[i];
-            this.reader.setIndex(file.localHeaderOffset);
-            this.checkSignature(sig.LOCAL_FILE_HEADER);
-            file.readLocalPart(this.reader);
-            file.handleUTF8();
-            file.processAttributes();
-        }
-    },
-    /**
-     * Read the central directory.
-     */
-    readCentralDir: function() {
-        var file;
-
-        this.reader.setIndex(this.centralDirOffset);
-        while (this.reader.readAndCheckSignature(sig.CENTRAL_FILE_HEADER)) {
-            file = new ZipEntry({
-                zip64: this.zip64
-            }, this.loadOptions);
-            file.readCentralPart(this.reader);
-            this.files.push(file);
-        }
-
-        if (this.centralDirRecords !== this.files.length) {
-            if (this.centralDirRecords !== 0 && this.files.length === 0) {
-                // We expected some records but couldn't find ANY.
-                // This is really suspicious, as if something went wrong.
-                throw new Error("Corrupted zip or bug: expected " + this.centralDirRecords + " records in central dir, got " + this.files.length);
-            } else {
-                // We found some records but not all.
-                // Something is wrong but we got something for the user: no error here.
-                // console.warn("expected", this.centralDirRecords, "records in central dir, got", this.files.length);
-            }
-        }
-    },
-    /**
-     * Read the end of central directory.
-     */
-    readEndOfCentral: function() {
-        var offset = this.reader.lastIndexOfSignature(sig.CENTRAL_DIRECTORY_END);
-        if (offset < 0) {
-            // Check if the content is a truncated zip or complete garbage.
-            // A "LOCAL_FILE_HEADER" is not required at the beginning (auto
-            // extractible zip for example) but it can give a good hint.
-            // If an ajax request was used without responseType, we will also
-            // get unreadable data.
-            var isGarbage = !this.isSignature(0, sig.LOCAL_FILE_HEADER);
-
-            if (isGarbage) {
-                throw new Error("Can't find end of central directory : is this a zip file ? " +
-                                "If it is, see https://stuk.github.io/jszip/documentation/howto/read_zip.html");
-            } else {
-                throw new Error("Corrupted zip: can't find end of central directory");
-            }
-
-        }
-        this.reader.setIndex(offset);
-        var endOfCentralDirOffset = offset;
-        this.checkSignature(sig.CENTRAL_DIRECTORY_END);
-        this.readBlockEndOfCentral();
-
-
-        /* extract from the zip spec :
-            4)  If one of the fields in the end of central directory
-                record is too small to hold required data, the field
-                should be set to -1 (0xFFFF or 0xFFFFFFFF) and the
-                ZIP64 format record should be created.
-            5)  The end of central directory record and the
-                Zip64 end of central directory locator record must
-                reside on the same disk when splitting or spanning
-                an archive.
-         */
-        if (this.diskNumber === utils.MAX_VALUE_16BITS || this.diskWithCentralDirStart === utils.MAX_VALUE_16BITS || this.centralDirRecordsOnThisDisk === utils.MAX_VALUE_16BITS || this.centralDirRecords === utils.MAX_VALUE_16BITS || this.centralDirSize === utils.MAX_VALUE_32BITS || this.centralDirOffset === utils.MAX_VALUE_32BITS) {
-            this.zip64 = true;
-
-            /*
-            Warning : the zip64 extension is supported, but ONLY if the 64bits integer read from
-            the zip file can fit into a 32bits integer. This cannot be solved : JavaScript represents
-            all numbers as 64-bit double precision IEEE 754 floating point numbers.
-            So, we have 53bits for integers and bitwise operations treat everything as 32bits.
-            see https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Operators/Bitwise_Operators
-            and http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-262.pdf section 8.5
-            */
-
-            // should look for a zip64 EOCD locator
-            offset = this.reader.lastIndexOfSignature(sig.ZIP64_CENTRAL_DIRECTORY_LOCATOR);
-            if (offset < 0) {
-                throw new Error("Corrupted zip: can't find the ZIP64 end of central directory locator");
-            }
-            this.reader.setIndex(offset);
-            this.checkSignature(sig.ZIP64_CENTRAL_DIRECTORY_LOCATOR);
-            this.readBlockZip64EndOfCentralLocator();
-
-            // now the zip64 EOCD record
-            if (!this.isSignature(this.relativeOffsetEndOfZip64CentralDir, sig.ZIP64_CENTRAL_DIRECTORY_END)) {
-                // console.warn("ZIP64 end of central directory not where expected.");
-                this.relativeOffsetEndOfZip64CentralDir = this.reader.lastIndexOfSignature(sig.ZIP64_CENTRAL_DIRECTORY_END);
-                if (this.relativeOffsetEndOfZip64CentralDir < 0) {
-                    throw new Error("Corrupted zip: can't find the ZIP64 end of central directory");
-                }
-            }
-            this.reader.setIndex(this.relativeOffsetEndOfZip64CentralDir);
-            this.checkSignature(sig.ZIP64_CENTRAL_DIRECTORY_END);
-            this.readBlockZip64EndOfCentral();
-        }
-
-        var expectedEndOfCentralDirOffset = this.centralDirOffset + this.centralDirSize;
-        if (this.zip64) {
-            expectedEndOfCentralDirOffset += 20; // end of central dir 64 locator
-            expectedEndOfCentralDirOffset += 12 /* should not include the leading 12 bytes */ + this.zip64EndOfCentralSize;
-        }
-
-        var extraBytes = endOfCentralDirOffset - expectedEndOfCentralDirOffset;
-
-        if (extraBytes > 0) {
-            // console.warn(extraBytes, "extra bytes at beginning or within zipfile");
-            if (this.isSignature(endOfCentralDirOffset, sig.CENTRAL_FILE_HEADER)) {
-                // The offsets seem wrong, but we have something at the specified offset.
-                // So… we keep it.
-            } else {
-                // the offset is wrong, update the "zero" of the reader
-                // this happens if data has been prepended (crx files for example)
-                this.reader.zero = extraBytes;
-            }
-        } else if (extraBytes < 0) {
-            throw new Error("Corrupted zip: missing " + Math.abs(extraBytes) + " bytes.");
-        }
-    },
-    prepareReader: function(data) {
-        this.reader = readerFor(data);
-    },
-    /**
-     * Read a zip file and create ZipEntries.
-     * @param {String|ArrayBuffer|Uint8Array|Buffer} data the binary string representing a zip file.
-     */
-    load: function(data) {
-        this.prepareReader(data);
-        this.readEndOfCentral();
-        this.readCentralDir();
-        this.readLocalFiles();
-    }
-};
-// }}} end of ZipEntries
-module.exports = ZipEntries;
-
-
-/***/ }),
-/* 814 */,
-/* 815 */,
-/* 816 */,
-/* 817 */
+/***/ 817:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -34696,7 +26688,7 @@ module.exports = ZipEntries;
 var utils = __webpack_require__(901);
 var external = __webpack_require__(857);
 var utf8 = __webpack_require__(341);
-var ZipEntries = __webpack_require__(813);
+var ZipEntries = __webpack_require__(437);
 var Crc32Probe = __webpack_require__(468);
 var nodejsUtils = __webpack_require__(347);
 
@@ -34776,7 +26768,8 @@ module.exports = function (data, options) {
 
 
 /***/ }),
-/* 818 */
+
+/***/ 818:
 /***/ (function(module) {
 
 // Returns a wrapper function that returns a wrapped callback
@@ -34815,13 +26808,8 @@ function wrappy (fn, cb) {
 
 
 /***/ }),
-/* 819 */,
-/* 820 */,
-/* 821 */,
-/* 822 */,
-/* 823 */,
-/* 824 */,
-/* 825 */
+
+/***/ 825:
 /***/ (function(__unusedmodule, exports) {
 
 "use strict";
@@ -34839,70 +26827,8 @@ exports.dosPermissions = null;
 
 
 /***/ }),
-/* 826 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const SemVer = __webpack_require__(82)
-const parse = __webpack_require__(621)
-const {re, t} = __webpack_require__(609)
-
-const coerce = (version, options) => {
-  if (version instanceof SemVer) {
-    return version
-  }
-
-  if (typeof version === 'number') {
-    version = String(version)
-  }
-
-  if (typeof version !== 'string') {
-    return null
-  }
-
-  options = options || {}
-
-  let match = null
-  if (!options.rtl) {
-    match = version.match(re[t.COERCE])
-  } else {
-    // Find the right-most coercible string that does not share
-    // a terminus with a more left-ward coercible string.
-    // Eg, '1.2.3.4' wants to coerce '2.3.4', not '3.4' or '4'
-    //
-    // Walk through the string checking with a /g regexp
-    // Manually set the index so as to pick up overlapping matches.
-    // Stop when we get a match that ends at the string end, since no
-    // coercible string can be more right-ward without the same terminus.
-    let next
-    while ((next = re[t.COERCERTL].exec(version)) &&
-        (!match || match.index + match[0].length !== version.length)
-    ) {
-      if (!match ||
-            next.index + next[0].length !== match.index + match[0].length) {
-        match = next
-      }
-      re[t.COERCERTL].lastIndex = next.index + next[1].length + next[2].length
-    }
-    // leave it in a clean state
-    re[t.COERCERTL].lastIndex = -1
-  }
-
-  if (match === null)
-    return null
-
-  return parse(`${match[2]}.${match[3] || '0'}.${match[4] || '0'}`, options)
-}
-module.exports = coerce
-
-
-/***/ }),
-/* 827 */,
-/* 828 */,
-/* 829 */,
-/* 830 */,
-/* 831 */,
-/* 832 */,
-/* 833 */
+/***/ 833:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var fs = __webpack_require__(747)
@@ -35281,26 +27207,15 @@ function retry () {
 
 
 /***/ }),
-/* 834 */,
-/* 835 */
+
+/***/ 835:
 /***/ (function(module) {
 
 module.exports = require("url");
 
 /***/ }),
-/* 836 */,
-/* 837 */,
-/* 838 */,
-/* 839 */,
-/* 840 */,
-/* 841 */
-/***/ (function(module) {
 
-module.exports = {"name":"sharp","description":"High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP, AVIF and TIFF images","version":"0.28.1","author":"Lovell Fuller <npm@lovell.info>","homepage":"https://github.com/lovell/sharp","contributors":["Pierre Inglebert <pierre.inglebert@gmail.com>","Jonathan Ong <jonathanrichardong@gmail.com>","Chanon Sajjamanochai <chanon.s@gmail.com>","Juliano Julio <julianojulio@gmail.com>","Daniel Gasienica <daniel@gasienica.ch>","Julian Walker <julian@fiftythree.com>","Amit Pitaru <pitaru.amit@gmail.com>","Brandon Aaron <hello.brandon@aaron.sh>","Andreas Lind <andreas@one.com>","Maurus Cuelenaere <mcuelenaere@gmail.com>","Linus Unnebäck <linus@folkdatorn.se>","Victor Mateevitsi <mvictoras@gmail.com>","Alaric Holloway <alaric.holloway@gmail.com>","Bernhard K. Weisshuhn <bkw@codingforce.com>","Chris Riley <criley@primedia.com>","David Carley <dacarley@gmail.com>","John Tobin <john@limelightmobileinc.com>","Kenton Gray <kentongray@gmail.com>","Felix Bünemann <Felix.Buenemann@gmail.com>","Samy Al Zahrani <samyalzahrany@gmail.com>","Chintan Thakkar <lemnisk8@gmail.com>","F. Orlando Galashan <frulo@gmx.de>","Kleis Auke Wolthuizen <info@kleisauke.nl>","Matt Hirsch <mhirsch@media.mit.edu>","Matthias Thoemmes <thoemmes@gmail.com>","Patrick Paskaris <patrick@paskaris.gr>","Jérémy Lal <kapouer@melix.org>","Rahul Nanwani <r.nanwani@gmail.com>","Alice Monday <alice0meta@gmail.com>","Kristo Jorgenson <kristo.jorgenson@gmail.com>","YvesBos <yves_bos@outlook.com>","Guy Maliar <guy@tailorbrands.com>","Nicolas Coden <nicolas@ncoden.fr>","Matt Parrish <matt.r.parrish@gmail.com>","Marcel Bretschneider <marcel.bretschneider@gmail.com>","Matthew McEachen <matthew+github@mceachen.org>","Jarda Kotěšovec <jarda.kotesovec@gmail.com>","Kenric D'Souza <kenric.dsouza@gmail.com>","Oleh Aleinyk <oleg.aleynik@gmail.com>","Marcel Bretschneider <marcel.bretschneider@gmail.com>","Andrea Bianco <andrea.bianco@unibas.ch>","Rik Heywood <rik@rik.org>","Thomas Parisot <hi@oncletom.io>","Nathan Graves <nathanrgraves+github@gmail.com>","Tom Lokhorst <tom@lokhorst.eu>","Espen Hovlandsdal <espen@hovlandsdal.com>","Sylvain Dumont <sylvain.dumont35@gmail.com>","Alun Davies <alun.owain.davies@googlemail.com>","Aidan Hoolachan <ajhoolachan21@gmail.com>","Axel Eirola <axel.eirola@iki.fi>","Freezy <freezy@xbmc.org>","Daiz <taneli.vatanen@gmail.com>","Julian Aubourg <j@ubourg.net>","Keith Belovay <keith@picthrive.com>","Michael B. Klein <mbklein@gmail.com>","Jordan Prudhomme <jordan@raboland.fr>","Ilya Ovdin <iovdin@gmail.com>","Andargor <andargor@yahoo.com>","Paul Neave <paul.neave@gmail.com>","Brendan Kennedy <brenwken@gmail.com>","Brychan Bennett-Odlum <git@brychan.io>","Edward Silverton <e.silverton@gmail.com>","Roman Malieiev <aromaleev@gmail.com>","Tomas Szabo <tomas.szabo@deftomat.com>","Robert O'Rourke <robert@o-rourke.org>","Guillermo Alfonso Varela Chouciño <guillevch@gmail.com>","Christian Flintrup <chr@gigahost.dk>","Manan Jadhav <manan@motionden.com>","Leon Radley <leon@radley.se>","alza54 <alza54@thiocod.in>"],"scripts":{"install":"(node install/libvips && node install/dll-copy && prebuild-install) || (node-gyp rebuild && node install/dll-copy)","clean":"rm -rf node_modules/ build/ vendor/ .nyc_output/ coverage/ test/fixtures/output.*","test":"semistandard && cpplint && npm run test-unit && npm run test-licensing","test-unit":"nyc --reporter=lcov --branches=99 mocha --slow=1000 --timeout=60000 ./test/unit/*.js","test-licensing":"license-checker --production --summary --onlyAllow=\"Apache-2.0;BSD;ISC;MIT\"","test-coverage":"./test/coverage/report.sh","test-leak":"./test/leak/leak.sh","docs-build":"documentation lint lib && node docs/build && node docs/search-index/build","docs-serve":"cd docs && npx serve","docs-publish":"cd docs && npx firebase-tools deploy --project pixelplumbing --only hosting:pixelplumbing-sharp"},"main":"lib/index.js","files":["binding.gyp","install/**","lib/**","src/**"],"repository":{"type":"git","url":"git://github.com/lovell/sharp"},"keywords":["jpeg","png","webp","avif","tiff","gif","svg","dzi","image","resize","thumbnail","crop","embed","libvips","vips"],"dependencies":{"color":"^3.1.3","detect-libc":"^1.0.3","node-addon-api":"^3.1.0","prebuild-install":"^6.1.1","semver":"^7.3.5","simple-get":"^3.1.0","tar-fs":"^2.1.1","tunnel-agent":"^0.6.0"},"devDependencies":{"async":"^3.2.0","cc":"^3.0.1","decompress-zip":"^0.3.3","documentation":"^13.2.0","exif-reader":"^1.0.3","icc":"^2.0.0","license-checker":"^25.0.1","mocha":"^8.3.2","mock-fs":"^4.13.0","nyc":"^15.1.0","prebuild":"^10.0.1","rimraf":"^3.0.2","semistandard":"^16.0.0"},"license":"Apache-2.0","config":{"libvips":"8.10.6","runtime":"napi","target":3},"engines":{"node":">=10"},"funding":{"url":"https://opencollective.com/libvips"},"binary":{"napi_versions":[3]},"semistandard":{"env":["mocha"]},"cc":{"linelength":"120","filter":["build/include"]}};
-
-/***/ }),
-/* 842 */,
-/* 843 */
+/***/ 843:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -35321,75 +27236,8 @@ module.exports = {
 
 
 /***/ }),
-/* 844 */,
-/* 845 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const SemVer = __webpack_require__(82)
-const Range = __webpack_require__(174)
-const gt = __webpack_require__(180)
-
-const minVersion = (range, loose) => {
-  range = new Range(range, loose)
-
-  let minver = new SemVer('0.0.0')
-  if (range.test(minver)) {
-    return minver
-  }
-
-  minver = new SemVer('0.0.0-0')
-  if (range.test(minver)) {
-    return minver
-  }
-
-  minver = null
-  for (let i = 0; i < range.set.length; ++i) {
-    const comparators = range.set[i]
-
-    let setMin = null
-    comparators.forEach((comparator) => {
-      // Clone to avoid manipulating the comparator's semver object.
-      const compver = new SemVer(comparator.semver.version)
-      switch (comparator.operator) {
-        case '>':
-          if (compver.prerelease.length === 0) {
-            compver.patch++
-          } else {
-            compver.prerelease.push(0)
-          }
-          compver.raw = compver.format()
-          /* fallthrough */
-        case '':
-        case '>=':
-          if (!setMin || gt(compver, setMin)) {
-            setMin = compver
-          }
-          break
-        case '<':
-        case '<=':
-          /* Ignore maximum versions */
-          break
-        /* istanbul ignore next */
-        default:
-          throw new Error(`Unexpected operation: ${comparator.operator}`)
-      }
-    })
-    if (setMin && (!minver || gt(minver, setMin)))
-      minver = setMin
-  }
-
-  if (minver && range.test(minver)) {
-    return minver
-  }
-
-  return null
-}
-module.exports = minVersion
-
-
-/***/ }),
-/* 846 */,
-/* 847 */
+/***/ 847:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -35399,7 +27247,7 @@ var utils = __webpack_require__(318);
 var bind = __webpack_require__(206);
 var Axios = __webpack_require__(536);
 var mergeConfig = __webpack_require__(781);
-var defaults = __webpack_require__(164);
+var defaults = __webpack_require__(82);
 
 /**
  * Create an instance of Axios
@@ -35452,7 +27300,8 @@ module.exports.default = axios;
 
 
 /***/ }),
-/* 848 */
+
+/***/ 848:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 module.exports = globSync
@@ -35944,25 +27793,36 @@ GlobSync.prototype._makeAbs = function (f) {
 
 
 /***/ }),
-/* 849 */
-/***/ (function(module) {
 
-// parse out just the options we care about so we always get a consistent
-// obj with keys in a consistent order.
-const opts = ['includePrerelease', 'loose', 'rtl']
-const parseOptions = options =>
-  !options ? {}
-  : typeof options !== 'object' ? { loose: true }
-  : opts.filter(k => options[k]).reduce((options, k) => {
-    options[k] = true
-    return options
-  }, {})
-module.exports = parseOptions
+/***/ 849:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(318);
+
+/**
+ * Transform the data for a request or a response
+ *
+ * @param {Object|String} data The data to be transformed
+ * @param {Array} headers The headers for the request or response
+ * @param {Array|Function} fns A single function or Array of functions
+ * @returns {*} The resulting transformed data
+ */
+module.exports = function transformData(data, headers, fns) {
+  /*eslint no-param-reassign:0*/
+  utils.forEach(fns, function transform(fn) {
+    data = fn(data, headers);
+  });
+
+  return data;
+};
 
 
 /***/ }),
-/* 850 */,
-/* 851 */
+
+/***/ 851:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -35980,139 +27840,203 @@ module.exports = {
 
 
 /***/ }),
-/* 852 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+
+/***/ 852:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
+// String encode/decode helpers
 
 
-const fs = __webpack_require__(747);
-const os = __webpack_require__(87);
-const path = __webpack_require__(622);
-const spawnSync = __webpack_require__(4).spawnSync;
-const semver = __webpack_require__(973);
-const platform = __webpack_require__(958);
 
-const env = process.env;
-const minimumLibvipsVersionLabelled = env.npm_package_config_libvips || /* istanbul ignore next */
-  __webpack_require__(841).config.libvips;
-const minimumLibvipsVersion = semver.coerce(minimumLibvipsVersionLabelled).version;
+var utils = __webpack_require__(33);
 
-const spawnSyncOptions = {
-  encoding: 'utf8',
-  shell: true
-};
 
-const mkdirSync = function (dirPath) {
-  try {
-    fs.mkdirSync(dirPath);
-  } catch (err) {
-    /* istanbul ignore if */
-    if (err.code !== 'EEXIST') {
-      throw err;
+// Quick check if we can use fast array to bin string conversion
+//
+// - apply(Array) can fail on Android 2.2
+// - apply(Uint8Array) can fail on iOS 5.1 Safari
+//
+var STR_APPLY_OK = true;
+var STR_APPLY_UIA_OK = true;
+
+try { String.fromCharCode.apply(null, [ 0 ]); } catch (__) { STR_APPLY_OK = false; }
+try { String.fromCharCode.apply(null, new Uint8Array(1)); } catch (__) { STR_APPLY_UIA_OK = false; }
+
+
+// Table with utf8 lengths (calculated by first byte of sequence)
+// Note, that 5 & 6-byte values and some 4-byte values can not be represented in JS,
+// because max possible codepoint is 0x10ffff
+var _utf8len = new utils.Buf8(256);
+for (var q = 0; q < 256; q++) {
+  _utf8len[q] = (q >= 252 ? 6 : q >= 248 ? 5 : q >= 240 ? 4 : q >= 224 ? 3 : q >= 192 ? 2 : 1);
+}
+_utf8len[254] = _utf8len[254] = 1; // Invalid sequence start
+
+
+// convert string to array (typed, when possible)
+exports.string2buf = function (str) {
+  var buf, c, c2, m_pos, i, str_len = str.length, buf_len = 0;
+
+  // count binary size
+  for (m_pos = 0; m_pos < str_len; m_pos++) {
+    c = str.charCodeAt(m_pos);
+    if ((c & 0xfc00) === 0xd800 && (m_pos + 1 < str_len)) {
+      c2 = str.charCodeAt(m_pos + 1);
+      if ((c2 & 0xfc00) === 0xdc00) {
+        c = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
+        m_pos++;
+      }
     }
+    buf_len += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
   }
-};
 
-const cachePath = function () {
-  const npmCachePath = env.npm_config_cache || /* istanbul ignore next */
-    (env.APPDATA ? path.join(env.APPDATA, 'npm-cache') : path.join(os.homedir(), '.npm'));
-  mkdirSync(npmCachePath);
-  const libvipsCachePath = path.join(npmCachePath, '_libvips');
-  mkdirSync(libvipsCachePath);
-  return libvipsCachePath;
-};
+  // allocate buffer
+  buf = new utils.Buf8(buf_len);
 
-const log = function (item) {
-  if (item instanceof Error) {
-    console.error(`sharp: Installation error: ${item.message}`);
-  } else {
-    console.log(`sharp: ${item}`);
-  }
-};
-
-const isRosetta = function () {
-  /* istanbul ignore next */
-  if (process.platform === 'darwin' && process.arch === 'x64') {
-    const translated = spawnSync('sysctl sysctl.proc_translated', spawnSyncOptions).stdout;
-    return (translated || '').trim() === 'sysctl.proc_translated: 1';
-  }
-  return false;
-};
-
-const globalLibvipsVersion = function () {
-  if (process.platform !== 'win32') {
-    const globalLibvipsVersion = spawnSync(`PKG_CONFIG_PATH="${pkgConfigPath()}" pkg-config --modversion vips-cpp`, spawnSyncOptions).stdout;
-    /* istanbul ignore next */
-    return (globalLibvipsVersion || '').trim();
-  } else {
-    return '';
-  }
-};
-
-const hasVendoredLibvips = function () {
-  const currentPlatformId = platform();
-  const vendorPath = __webpack_require__.ab + "vendor/" + minimumLibvipsVersion;
-  let vendorPlatformId;
-  try {
-    vendorPlatformId = require(path.join(vendorPath, 'platform.json'));
-  } catch (err) {}
-  /* istanbul ignore else */
-  if (vendorPlatformId) {
-    /* istanbul ignore else */
-    if (currentPlatformId === vendorPlatformId) {
-      return true;
+  // convert
+  for (i = 0, m_pos = 0; i < buf_len; m_pos++) {
+    c = str.charCodeAt(m_pos);
+    if ((c & 0xfc00) === 0xd800 && (m_pos + 1 < str_len)) {
+      c2 = str.charCodeAt(m_pos + 1);
+      if ((c2 & 0xfc00) === 0xdc00) {
+        c = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
+        m_pos++;
+      }
+    }
+    if (c < 0x80) {
+      /* one byte */
+      buf[i++] = c;
+    } else if (c < 0x800) {
+      /* two bytes */
+      buf[i++] = 0xC0 | (c >>> 6);
+      buf[i++] = 0x80 | (c & 0x3f);
+    } else if (c < 0x10000) {
+      /* three bytes */
+      buf[i++] = 0xE0 | (c >>> 12);
+      buf[i++] = 0x80 | (c >>> 6 & 0x3f);
+      buf[i++] = 0x80 | (c & 0x3f);
     } else {
-      throw new Error(`'${vendorPlatformId}' binaries cannot be used on the '${currentPlatformId}' platform. Please remove the 'node_modules/sharp' directory and run 'npm install' on the '${currentPlatformId}' platform.`);
+      /* four bytes */
+      buf[i++] = 0xf0 | (c >>> 18);
+      buf[i++] = 0x80 | (c >>> 12 & 0x3f);
+      buf[i++] = 0x80 | (c >>> 6 & 0x3f);
+      buf[i++] = 0x80 | (c & 0x3f);
     }
-  } else {
-    return false;
   }
+
+  return buf;
 };
 
-const pkgConfigPath = function () {
-  if (process.platform !== 'win32') {
-    const brewPkgConfigPath = spawnSync('which brew >/dev/null 2>&1 && eval $(brew --env) && echo $PKG_CONFIG_LIBDIR', spawnSyncOptions).stdout || '';
-    return [brewPkgConfigPath.trim(), env.PKG_CONFIG_PATH, '/usr/local/lib/pkgconfig', '/usr/lib/pkgconfig']
-      .filter(function (p) { return !!p; })
-      .join(':');
-  } else {
-    return '';
+// Helper (used in 2 places)
+function buf2binstring(buf, len) {
+  // On Chrome, the arguments in a function call that are allowed is `65534`.
+  // If the length of the buffer is smaller than that, we can use this optimization,
+  // otherwise we will take a slower path.
+  if (len < 65534) {
+    if ((buf.subarray && STR_APPLY_UIA_OK) || (!buf.subarray && STR_APPLY_OK)) {
+      return String.fromCharCode.apply(null, utils.shrinkBuf(buf, len));
+    }
   }
+
+  var result = '';
+  for (var i = 0; i < len; i++) {
+    result += String.fromCharCode(buf[i]);
+  }
+  return result;
+}
+
+
+// Convert byte array to binary string
+exports.buf2binstring = function (buf) {
+  return buf2binstring(buf, buf.length);
 };
 
-const useGlobalLibvips = function () {
-  if (Boolean(env.SHARP_IGNORE_GLOBAL_LIBVIPS) === true) {
-    return false;
+
+// Convert binary string (typed, when possible)
+exports.binstring2buf = function (str) {
+  var buf = new utils.Buf8(str.length);
+  for (var i = 0, len = buf.length; i < len; i++) {
+    buf[i] = str.charCodeAt(i);
   }
-  /* istanbul ignore next */
-  if (isRosetta()) {
-    return false;
-  }
-  const globalVipsVersion = globalLibvipsVersion();
-  return !!globalVipsVersion && /* istanbul ignore next */
-    semver.gte(globalVipsVersion, minimumLibvipsVersion);
+  return buf;
 };
 
-module.exports = {
-  minimumLibvipsVersion,
-  minimumLibvipsVersionLabelled,
-  cachePath,
-  log,
-  globalLibvipsVersion,
-  hasVendoredLibvips,
-  pkgConfigPath,
-  useGlobalLibvips,
-  mkdirSync
+
+// convert array to string
+exports.buf2string = function (buf, max) {
+  var i, out, c, c_len;
+  var len = max || buf.length;
+
+  // Reserve max possible length (2 words per char)
+  // NB: by unknown reasons, Array is significantly faster for
+  //     String.fromCharCode.apply than Uint16Array.
+  var utf16buf = new Array(len * 2);
+
+  for (out = 0, i = 0; i < len;) {
+    c = buf[i++];
+    // quick process ascii
+    if (c < 0x80) { utf16buf[out++] = c; continue; }
+
+    c_len = _utf8len[c];
+    // skip 5 & 6 byte codes
+    if (c_len > 4) { utf16buf[out++] = 0xfffd; i += c_len - 1; continue; }
+
+    // apply mask on first byte
+    c &= c_len === 2 ? 0x1f : c_len === 3 ? 0x0f : 0x07;
+    // join the rest
+    while (c_len > 1 && i < len) {
+      c = (c << 6) | (buf[i++] & 0x3f);
+      c_len--;
+    }
+
+    // terminated by end of string?
+    if (c_len > 1) { utf16buf[out++] = 0xfffd; continue; }
+
+    if (c < 0x10000) {
+      utf16buf[out++] = c;
+    } else {
+      c -= 0x10000;
+      utf16buf[out++] = 0xd800 | ((c >> 10) & 0x3ff);
+      utf16buf[out++] = 0xdc00 | (c & 0x3ff);
+    }
+  }
+
+  return buf2binstring(utf16buf, out);
+};
+
+
+// Calculate max possible position in utf8 buffer,
+// that will not break sequence. If that's not possible
+// - (very small limits) return max size as is.
+//
+// buf[] - utf8 bytes array
+// max   - length limit (mandatory);
+exports.utf8border = function (buf, max) {
+  var pos;
+
+  max = max || buf.length;
+  if (max > buf.length) { max = buf.length; }
+
+  // go back from last position, until start of sequence found
+  pos = max - 1;
+  while (pos >= 0 && (buf[pos] & 0xC0) === 0x80) { pos--; }
+
+  // Very small and broken sequence,
+  // return max, because we should return something anyway.
+  if (pos < 0) { return max; }
+
+  // If we came to start of buffer - that means buffer is too small,
+  // return max too.
+  if (pos === 0) { return max; }
+
+  return (pos + _utf8len[buf[pos]] > max) ? pos : max;
 };
 
 
 /***/ }),
-/* 853 */,
-/* 854 */,
-/* 855 */,
-/* 856 */,
-/* 857 */
+
+/***/ 857:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -36138,33 +28062,8 @@ module.exports = {
 
 
 /***/ }),
-/* 858 */,
-/* 859 */,
-/* 860 */,
-/* 861 */,
-/* 862 */,
-/* 863 */,
-/* 864 */,
-/* 865 */,
-/* 866 */,
-/* 867 */,
-/* 868 */,
-/* 869 */,
-/* 870 */,
-/* 871 */,
-/* 872 */,
-/* 873 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-// Determine if version is greater than all the versions possible in the range.
-const outside = __webpack_require__(404)
-const gtr = (version, range, options) => outside(version, range, '>', options)
-module.exports = gtr
-
-
-/***/ }),
-/* 874 */,
-/* 875 */
+/***/ 875:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var Stream = __webpack_require__(413).Stream
@@ -36288,256 +28187,8 @@ function legacy (fs) {
 
 
 /***/ }),
-/* 876 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const SemVer = __webpack_require__(82)
-const minor = (a, loose) => new SemVer(a, loose).minor
-module.exports = minor
-
-
-/***/ }),
-/* 877 */,
-/* 878 */,
-/* 879 */,
-/* 880 */,
-/* 881 */,
-/* 882 */,
-/* 883 */,
-/* 884 */,
-/* 885 */,
-/* 886 */,
-/* 887 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-const Range = __webpack_require__(174)
-const Comparator = __webpack_require__(960)
-const { ANY } = Comparator
-const satisfies = __webpack_require__(953)
-const compare = __webpack_require__(233)
-
-// Complex range `r1 || r2 || ...` is a subset of `R1 || R2 || ...` iff:
-// - Every simple range `r1, r2, ...` is a null set, OR
-// - Every simple range `r1, r2, ...` which is not a null set is a subset of
-//   some `R1, R2, ...`
-//
-// Simple range `c1 c2 ...` is a subset of simple range `C1 C2 ...` iff:
-// - If c is only the ANY comparator
-//   - If C is only the ANY comparator, return true
-//   - Else if in prerelease mode, return false
-//   - else replace c with `[>=0.0.0]`
-// - If C is only the ANY comparator
-//   - if in prerelease mode, return true
-//   - else replace C with `[>=0.0.0]`
-// - Let EQ be the set of = comparators in c
-// - If EQ is more than one, return true (null set)
-// - Let GT be the highest > or >= comparator in c
-// - Let LT be the lowest < or <= comparator in c
-// - If GT and LT, and GT.semver > LT.semver, return true (null set)
-// - If any C is a = range, and GT or LT are set, return false
-// - If EQ
-//   - If GT, and EQ does not satisfy GT, return true (null set)
-//   - If LT, and EQ does not satisfy LT, return true (null set)
-//   - If EQ satisfies every C, return true
-//   - Else return false
-// - If GT
-//   - If GT.semver is lower than any > or >= comp in C, return false
-//   - If GT is >=, and GT.semver does not satisfy every C, return false
-//   - If GT.semver has a prerelease, and not in prerelease mode
-//     - If no C has a prerelease and the GT.semver tuple, return false
-// - If LT
-//   - If LT.semver is greater than any < or <= comp in C, return false
-//   - If LT is <=, and LT.semver does not satisfy every C, return false
-//   - If GT.semver has a prerelease, and not in prerelease mode
-//     - If no C has a prerelease and the LT.semver tuple, return false
-// - Else return true
-
-const subset = (sub, dom, options = {}) => {
-  if (sub === dom)
-    return true
-
-  sub = new Range(sub, options)
-  dom = new Range(dom, options)
-  let sawNonNull = false
-
-  OUTER: for (const simpleSub of sub.set) {
-    for (const simpleDom of dom.set) {
-      const isSub = simpleSubset(simpleSub, simpleDom, options)
-      sawNonNull = sawNonNull || isSub !== null
-      if (isSub)
-        continue OUTER
-    }
-    // the null set is a subset of everything, but null simple ranges in
-    // a complex range should be ignored.  so if we saw a non-null range,
-    // then we know this isn't a subset, but if EVERY simple range was null,
-    // then it is a subset.
-    if (sawNonNull)
-      return false
-  }
-  return true
-}
-
-const simpleSubset = (sub, dom, options) => {
-  if (sub === dom)
-    return true
-
-  if (sub.length === 1 && sub[0].semver === ANY) {
-    if (dom.length === 1 && dom[0].semver === ANY)
-      return true
-    else if (options.includePrerelease)
-      sub = [ new Comparator('>=0.0.0-0') ]
-    else
-      sub = [ new Comparator('>=0.0.0') ]
-  }
-
-  if (dom.length === 1 && dom[0].semver === ANY) {
-    if (options.includePrerelease)
-      return true
-    else
-      dom = [ new Comparator('>=0.0.0') ]
-  }
-
-  const eqSet = new Set()
-  let gt, lt
-  for (const c of sub) {
-    if (c.operator === '>' || c.operator === '>=')
-      gt = higherGT(gt, c, options)
-    else if (c.operator === '<' || c.operator === '<=')
-      lt = lowerLT(lt, c, options)
-    else
-      eqSet.add(c.semver)
-  }
-
-  if (eqSet.size > 1)
-    return null
-
-  let gtltComp
-  if (gt && lt) {
-    gtltComp = compare(gt.semver, lt.semver, options)
-    if (gtltComp > 0)
-      return null
-    else if (gtltComp === 0 && (gt.operator !== '>=' || lt.operator !== '<='))
-      return null
-  }
-
-  // will iterate one or zero times
-  for (const eq of eqSet) {
-    if (gt && !satisfies(eq, String(gt), options))
-      return null
-
-    if (lt && !satisfies(eq, String(lt), options))
-      return null
-
-    for (const c of dom) {
-      if (!satisfies(eq, String(c), options))
-        return false
-    }
-
-    return true
-  }
-
-  let higher, lower
-  let hasDomLT, hasDomGT
-  // if the subset has a prerelease, we need a comparator in the superset
-  // with the same tuple and a prerelease, or it's not a subset
-  let needDomLTPre = lt &&
-    !options.includePrerelease &&
-    lt.semver.prerelease.length ? lt.semver : false
-  let needDomGTPre = gt &&
-    !options.includePrerelease &&
-    gt.semver.prerelease.length ? gt.semver : false
-  // exception: <1.2.3-0 is the same as <1.2.3
-  if (needDomLTPre && needDomLTPre.prerelease.length === 1 &&
-      lt.operator === '<' && needDomLTPre.prerelease[0] === 0) {
-    needDomLTPre = false
-  }
-
-  for (const c of dom) {
-    hasDomGT = hasDomGT || c.operator === '>' || c.operator === '>='
-    hasDomLT = hasDomLT || c.operator === '<' || c.operator === '<='
-    if (gt) {
-      if (needDomGTPre) {
-        if (c.semver.prerelease && c.semver.prerelease.length &&
-            c.semver.major === needDomGTPre.major &&
-            c.semver.minor === needDomGTPre.minor &&
-            c.semver.patch === needDomGTPre.patch) {
-          needDomGTPre = false
-        }
-      }
-      if (c.operator === '>' || c.operator === '>=') {
-        higher = higherGT(gt, c, options)
-        if (higher === c && higher !== gt)
-          return false
-      } else if (gt.operator === '>=' && !satisfies(gt.semver, String(c), options))
-        return false
-    }
-    if (lt) {
-      if (needDomLTPre) {
-        if (c.semver.prerelease && c.semver.prerelease.length &&
-            c.semver.major === needDomLTPre.major &&
-            c.semver.minor === needDomLTPre.minor &&
-            c.semver.patch === needDomLTPre.patch) {
-          needDomLTPre = false
-        }
-      }
-      if (c.operator === '<' || c.operator === '<=') {
-        lower = lowerLT(lt, c, options)
-        if (lower === c && lower !== lt)
-          return false
-      } else if (lt.operator === '<=' && !satisfies(lt.semver, String(c), options))
-        return false
-    }
-    if (!c.operator && (lt || gt) && gtltComp !== 0)
-      return false
-  }
-
-  // if there was a < or >, and nothing in the dom, then must be false
-  // UNLESS it was limited by another range in the other direction.
-  // Eg, >1.0.0 <1.0.1 is still a subset of <2.0.0
-  if (gt && hasDomLT && !lt && gtltComp !== 0)
-    return false
-
-  if (lt && hasDomGT && !gt && gtltComp !== 0)
-    return false
-
-  // we needed a prerelease range in a specific tuple, but didn't get one
-  // then this isn't a subset.  eg >=1.2.3-pre is not a subset of >=1.0.0,
-  // because it includes prereleases in the 1.2.3 tuple
-  if (needDomGTPre || needDomLTPre)
-    return false
-
-  return true
-}
-
-// >=1.2.3 is lower than >1.2.3
-const higherGT = (a, b, options) => {
-  if (!a)
-    return b
-  const comp = compare(a.semver, b.semver, options)
-  return comp > 0 ? a
-    : comp < 0 ? b
-    : b.operator === '>' && a.operator === '>=' ? b
-    : a
-}
-
-// <=1.2.3 is higher than <1.2.3
-const lowerLT = (a, b, options) => {
-  if (!a)
-    return b
-  const comp = compare(a.semver, b.semver, options)
-  return comp < 0 ? a
-    : comp > 0 ? b
-    : b.operator === '<' && a.operator === '<=' ? b
-    : a
-}
-
-module.exports = subset
-
-
-/***/ }),
-/* 888 */,
-/* 889 */,
-/* 890 */
+/***/ 890:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 let _fs
@@ -36631,11 +28282,8 @@ module.exports = jsonfile
 
 
 /***/ }),
-/* 891 */,
-/* 892 */,
-/* 893 */,
-/* 894 */,
-/* 895 */
+
+/***/ 895:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -36695,27 +28343,14 @@ module.exports = function parseHeaders(headers) {
 
 
 /***/ }),
-/* 896 */,
-/* 897 */,
-/* 898 */,
-/* 899 */,
-/* 900 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const outside = __webpack_require__(404)
-// Determine if version is less than all the versions possible in the range
-const ltr = (version, range, options) => outside(version, range, '<', options)
-module.exports = ltr
-
-
-/***/ }),
-/* 901 */
+/***/ 901:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
 
 
-var support = __webpack_require__(188);
+var support = __webpack_require__(546);
 var base64 = __webpack_require__(729);
 var nodejsUtils = __webpack_require__(347);
 var setImmediate = __webpack_require__(597);
@@ -37192,9 +28827,8 @@ exports.prepareContent = function(name, inputData, isBinary, isOptimizedBinarySt
 
 
 /***/ }),
-/* 902 */,
-/* 903 */,
-/* 904 */
+
+/***/ 904:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -37227,18 +28861,8 @@ module.exports = ConvertWorker;
 
 
 /***/ }),
-/* 905 */,
-/* 906 */,
-/* 907 */,
-/* 908 */,
-/* 909 */,
-/* 910 */,
-/* 911 */,
-/* 912 */,
-/* 913 */,
-/* 914 */,
-/* 915 */,
-/* 916 */
+
+/***/ 916:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
@@ -37375,28 +28999,8 @@ if (typeof fs.realpath.native === 'function') {
 
 
 /***/ }),
-/* 917 */,
-/* 918 */,
-/* 919 */,
-/* 920 */,
-/* 921 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const SemVer = __webpack_require__(82)
-const patch = (a, loose) => new SemVer(a, loose).patch
-module.exports = patch
-
-
-/***/ }),
-/* 922 */,
-/* 923 */,
-/* 924 */,
-/* 925 */,
-/* 926 */,
-/* 927 */,
-/* 928 */,
-/* 929 */,
-/* 930 */
+/***/ 930:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -37408,8 +29012,8 @@ var buildFullPath = __webpack_require__(79);
 var buildURL = __webpack_require__(553);
 var http = __webpack_require__(605);
 var https = __webpack_require__(211);
-var httpFollow = __webpack_require__(505).http;
-var httpsFollow = __webpack_require__(505).https;
+var httpFollow = __webpack_require__(174).http;
+var httpsFollow = __webpack_require__(174).https;
 var url = __webpack_require__(835);
 var zlib = __webpack_require__(761);
 var pkg = __webpack_require__(481);
@@ -37706,1043 +29310,8 @@ module.exports = function httpAdapter(config) {
 
 
 /***/ }),
-/* 931 */,
-/* 932 */,
-/* 933 */,
-/* 934 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-
-/*<replacement>*/
-
-var pna = __webpack_require__(391);
-/*</replacement>*/
-
-module.exports = Readable;
-
-/*<replacement>*/
-var isArray = __webpack_require__(384);
-/*</replacement>*/
-
-/*<replacement>*/
-var Duplex;
-/*</replacement>*/
-
-Readable.ReadableState = ReadableState;
-
-/*<replacement>*/
-var EE = __webpack_require__(614).EventEmitter;
-
-var EElistenerCount = function (emitter, type) {
-  return emitter.listeners(type).length;
-};
-/*</replacement>*/
-
-/*<replacement>*/
-var Stream = __webpack_require__(811);
-/*</replacement>*/
-
-/*<replacement>*/
-
-var Buffer = __webpack_require__(226).Buffer;
-var OurUint8Array = global.Uint8Array || function () {};
-function _uint8ArrayToBuffer(chunk) {
-  return Buffer.from(chunk);
-}
-function _isUint8Array(obj) {
-  return Buffer.isBuffer(obj) || obj instanceof OurUint8Array;
-}
-
-/*</replacement>*/
-
-/*<replacement>*/
-var util = Object.create(__webpack_require__(490));
-util.inherits = __webpack_require__(476);
-/*</replacement>*/
-
-/*<replacement>*/
-var debugUtil = __webpack_require__(669);
-var debug = void 0;
-if (debugUtil && debugUtil.debuglog) {
-  debug = debugUtil.debuglog('stream');
-} else {
-  debug = function () {};
-}
-/*</replacement>*/
-
-var BufferList = __webpack_require__(139);
-var destroyImpl = __webpack_require__(576);
-var StringDecoder;
-
-util.inherits(Readable, Stream);
-
-var kProxyEvents = ['error', 'close', 'destroy', 'pause', 'resume'];
-
-function prependListener(emitter, event, fn) {
-  // Sadly this is not cacheable as some libraries bundle their own
-  // event emitter implementation with them.
-  if (typeof emitter.prependListener === 'function') return emitter.prependListener(event, fn);
-
-  // This is a hack to make sure that our error handler is attached before any
-  // userland ones.  NEVER DO THIS. This is here only because this code needs
-  // to continue to work with older versions of Node.js that do not include
-  // the prependListener() method. The goal is to eventually remove this hack.
-  if (!emitter._events || !emitter._events[event]) emitter.on(event, fn);else if (isArray(emitter._events[event])) emitter._events[event].unshift(fn);else emitter._events[event] = [fn, emitter._events[event]];
-}
-
-function ReadableState(options, stream) {
-  Duplex = Duplex || __webpack_require__(329);
-
-  options = options || {};
-
-  // Duplex streams are both readable and writable, but share
-  // the same options object.
-  // However, some cases require setting options to different
-  // values for the readable and the writable sides of the duplex stream.
-  // These options can be provided separately as readableXXX and writableXXX.
-  var isDuplex = stream instanceof Duplex;
-
-  // object stream flag. Used to make read(n) ignore n and to
-  // make all the buffer merging and length checks go away
-  this.objectMode = !!options.objectMode;
-
-  if (isDuplex) this.objectMode = this.objectMode || !!options.readableObjectMode;
-
-  // the point at which it stops calling _read() to fill the buffer
-  // Note: 0 is a valid value, means "don't call _read preemptively ever"
-  var hwm = options.highWaterMark;
-  var readableHwm = options.readableHighWaterMark;
-  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
-
-  if (hwm || hwm === 0) this.highWaterMark = hwm;else if (isDuplex && (readableHwm || readableHwm === 0)) this.highWaterMark = readableHwm;else this.highWaterMark = defaultHwm;
-
-  // cast to ints.
-  this.highWaterMark = Math.floor(this.highWaterMark);
-
-  // A linked list is used to store data chunks instead of an array because the
-  // linked list can remove elements from the beginning faster than
-  // array.shift()
-  this.buffer = new BufferList();
-  this.length = 0;
-  this.pipes = null;
-  this.pipesCount = 0;
-  this.flowing = null;
-  this.ended = false;
-  this.endEmitted = false;
-  this.reading = false;
-
-  // a flag to be able to tell if the event 'readable'/'data' is emitted
-  // immediately, or on a later tick.  We set this to true at first, because
-  // any actions that shouldn't happen until "later" should generally also
-  // not happen before the first read call.
-  this.sync = true;
-
-  // whenever we return null, then we set a flag to say
-  // that we're awaiting a 'readable' event emission.
-  this.needReadable = false;
-  this.emittedReadable = false;
-  this.readableListening = false;
-  this.resumeScheduled = false;
-
-  // has it been destroyed
-  this.destroyed = false;
-
-  // Crypto is kind of old and crusty.  Historically, its default string
-  // encoding is 'binary' so we have to make this configurable.
-  // Everything else in the universe uses 'utf8', though.
-  this.defaultEncoding = options.defaultEncoding || 'utf8';
-
-  // the number of writers that are awaiting a drain event in .pipe()s
-  this.awaitDrain = 0;
-
-  // if true, a maybeReadMore has been scheduled
-  this.readingMore = false;
-
-  this.decoder = null;
-  this.encoding = null;
-  if (options.encoding) {
-    if (!StringDecoder) StringDecoder = __webpack_require__(394).StringDecoder;
-    this.decoder = new StringDecoder(options.encoding);
-    this.encoding = options.encoding;
-  }
-}
-
-function Readable(options) {
-  Duplex = Duplex || __webpack_require__(329);
-
-  if (!(this instanceof Readable)) return new Readable(options);
-
-  this._readableState = new ReadableState(options, this);
-
-  // legacy
-  this.readable = true;
-
-  if (options) {
-    if (typeof options.read === 'function') this._read = options.read;
-
-    if (typeof options.destroy === 'function') this._destroy = options.destroy;
-  }
-
-  Stream.call(this);
-}
-
-Object.defineProperty(Readable.prototype, 'destroyed', {
-  get: function () {
-    if (this._readableState === undefined) {
-      return false;
-    }
-    return this._readableState.destroyed;
-  },
-  set: function (value) {
-    // we ignore the value if the stream
-    // has not been initialized yet
-    if (!this._readableState) {
-      return;
-    }
-
-    // backward compatibility, the user is explicitly
-    // managing destroyed
-    this._readableState.destroyed = value;
-  }
-});
-
-Readable.prototype.destroy = destroyImpl.destroy;
-Readable.prototype._undestroy = destroyImpl.undestroy;
-Readable.prototype._destroy = function (err, cb) {
-  this.push(null);
-  cb(err);
-};
-
-// Manually shove something into the read() buffer.
-// This returns true if the highWaterMark has not been hit yet,
-// similar to how Writable.write() returns true if you should
-// write() some more.
-Readable.prototype.push = function (chunk, encoding) {
-  var state = this._readableState;
-  var skipChunkCheck;
-
-  if (!state.objectMode) {
-    if (typeof chunk === 'string') {
-      encoding = encoding || state.defaultEncoding;
-      if (encoding !== state.encoding) {
-        chunk = Buffer.from(chunk, encoding);
-        encoding = '';
-      }
-      skipChunkCheck = true;
-    }
-  } else {
-    skipChunkCheck = true;
-  }
-
-  return readableAddChunk(this, chunk, encoding, false, skipChunkCheck);
-};
-
-// Unshift should *always* be something directly out of read()
-Readable.prototype.unshift = function (chunk) {
-  return readableAddChunk(this, chunk, null, true, false);
-};
-
-function readableAddChunk(stream, chunk, encoding, addToFront, skipChunkCheck) {
-  var state = stream._readableState;
-  if (chunk === null) {
-    state.reading = false;
-    onEofChunk(stream, state);
-  } else {
-    var er;
-    if (!skipChunkCheck) er = chunkInvalid(state, chunk);
-    if (er) {
-      stream.emit('error', er);
-    } else if (state.objectMode || chunk && chunk.length > 0) {
-      if (typeof chunk !== 'string' && !state.objectMode && Object.getPrototypeOf(chunk) !== Buffer.prototype) {
-        chunk = _uint8ArrayToBuffer(chunk);
-      }
-
-      if (addToFront) {
-        if (state.endEmitted) stream.emit('error', new Error('stream.unshift() after end event'));else addChunk(stream, state, chunk, true);
-      } else if (state.ended) {
-        stream.emit('error', new Error('stream.push() after EOF'));
-      } else {
-        state.reading = false;
-        if (state.decoder && !encoding) {
-          chunk = state.decoder.write(chunk);
-          if (state.objectMode || chunk.length !== 0) addChunk(stream, state, chunk, false);else maybeReadMore(stream, state);
-        } else {
-          addChunk(stream, state, chunk, false);
-        }
-      }
-    } else if (!addToFront) {
-      state.reading = false;
-    }
-  }
-
-  return needMoreData(state);
-}
-
-function addChunk(stream, state, chunk, addToFront) {
-  if (state.flowing && state.length === 0 && !state.sync) {
-    stream.emit('data', chunk);
-    stream.read(0);
-  } else {
-    // update the buffer info.
-    state.length += state.objectMode ? 1 : chunk.length;
-    if (addToFront) state.buffer.unshift(chunk);else state.buffer.push(chunk);
-
-    if (state.needReadable) emitReadable(stream);
-  }
-  maybeReadMore(stream, state);
-}
-
-function chunkInvalid(state, chunk) {
-  var er;
-  if (!_isUint8Array(chunk) && typeof chunk !== 'string' && chunk !== undefined && !state.objectMode) {
-    er = new TypeError('Invalid non-string/buffer chunk');
-  }
-  return er;
-}
-
-// if it's past the high water mark, we can push in some more.
-// Also, if we have no data yet, we can stand some
-// more bytes.  This is to work around cases where hwm=0,
-// such as the repl.  Also, if the push() triggered a
-// readable event, and the user called read(largeNumber) such that
-// needReadable was set, then we ought to push more, so that another
-// 'readable' event will be triggered.
-function needMoreData(state) {
-  return !state.ended && (state.needReadable || state.length < state.highWaterMark || state.length === 0);
-}
-
-Readable.prototype.isPaused = function () {
-  return this._readableState.flowing === false;
-};
-
-// backwards compatibility.
-Readable.prototype.setEncoding = function (enc) {
-  if (!StringDecoder) StringDecoder = __webpack_require__(394).StringDecoder;
-  this._readableState.decoder = new StringDecoder(enc);
-  this._readableState.encoding = enc;
-  return this;
-};
-
-// Don't raise the hwm > 8MB
-var MAX_HWM = 0x800000;
-function computeNewHighWaterMark(n) {
-  if (n >= MAX_HWM) {
-    n = MAX_HWM;
-  } else {
-    // Get the next highest power of 2 to prevent increasing hwm excessively in
-    // tiny amounts
-    n--;
-    n |= n >>> 1;
-    n |= n >>> 2;
-    n |= n >>> 4;
-    n |= n >>> 8;
-    n |= n >>> 16;
-    n++;
-  }
-  return n;
-}
-
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function howMuchToRead(n, state) {
-  if (n <= 0 || state.length === 0 && state.ended) return 0;
-  if (state.objectMode) return 1;
-  if (n !== n) {
-    // Only flow one buffer at a time
-    if (state.flowing && state.length) return state.buffer.head.data.length;else return state.length;
-  }
-  // If we're asking for more than the current hwm, then raise the hwm.
-  if (n > state.highWaterMark) state.highWaterMark = computeNewHighWaterMark(n);
-  if (n <= state.length) return n;
-  // Don't have enough
-  if (!state.ended) {
-    state.needReadable = true;
-    return 0;
-  }
-  return state.length;
-}
-
-// you can override either this method, or the async _read(n) below.
-Readable.prototype.read = function (n) {
-  debug('read', n);
-  n = parseInt(n, 10);
-  var state = this._readableState;
-  var nOrig = n;
-
-  if (n !== 0) state.emittedReadable = false;
-
-  // if we're doing read(0) to trigger a readable event, but we
-  // already have a bunch of data in the buffer, then just trigger
-  // the 'readable' event and move on.
-  if (n === 0 && state.needReadable && (state.length >= state.highWaterMark || state.ended)) {
-    debug('read: emitReadable', state.length, state.ended);
-    if (state.length === 0 && state.ended) endReadable(this);else emitReadable(this);
-    return null;
-  }
-
-  n = howMuchToRead(n, state);
-
-  // if we've ended, and we're now clear, then finish it up.
-  if (n === 0 && state.ended) {
-    if (state.length === 0) endReadable(this);
-    return null;
-  }
-
-  // All the actual chunk generation logic needs to be
-  // *below* the call to _read.  The reason is that in certain
-  // synthetic stream cases, such as passthrough streams, _read
-  // may be a completely synchronous operation which may change
-  // the state of the read buffer, providing enough data when
-  // before there was *not* enough.
-  //
-  // So, the steps are:
-  // 1. Figure out what the state of things will be after we do
-  // a read from the buffer.
-  //
-  // 2. If that resulting state will trigger a _read, then call _read.
-  // Note that this may be asynchronous, or synchronous.  Yes, it is
-  // deeply ugly to write APIs this way, but that still doesn't mean
-  // that the Readable class should behave improperly, as streams are
-  // designed to be sync/async agnostic.
-  // Take note if the _read call is sync or async (ie, if the read call
-  // has returned yet), so that we know whether or not it's safe to emit
-  // 'readable' etc.
-  //
-  // 3. Actually pull the requested chunks out of the buffer and return.
-
-  // if we need a readable event, then we need to do some reading.
-  var doRead = state.needReadable;
-  debug('need readable', doRead);
-
-  // if we currently have less than the highWaterMark, then also read some
-  if (state.length === 0 || state.length - n < state.highWaterMark) {
-    doRead = true;
-    debug('length less than watermark', doRead);
-  }
-
-  // however, if we've ended, then there's no point, and if we're already
-  // reading, then it's unnecessary.
-  if (state.ended || state.reading) {
-    doRead = false;
-    debug('reading or ended', doRead);
-  } else if (doRead) {
-    debug('do read');
-    state.reading = true;
-    state.sync = true;
-    // if the length is currently zero, then we *need* a readable event.
-    if (state.length === 0) state.needReadable = true;
-    // call internal read method
-    this._read(state.highWaterMark);
-    state.sync = false;
-    // If _read pushed data synchronously, then `reading` will be false,
-    // and we need to re-evaluate how much data we can return to the user.
-    if (!state.reading) n = howMuchToRead(nOrig, state);
-  }
-
-  var ret;
-  if (n > 0) ret = fromList(n, state);else ret = null;
-
-  if (ret === null) {
-    state.needReadable = true;
-    n = 0;
-  } else {
-    state.length -= n;
-  }
-
-  if (state.length === 0) {
-    // If we have nothing in the buffer, then we want to know
-    // as soon as we *do* get something into the buffer.
-    if (!state.ended) state.needReadable = true;
-
-    // If we tried to read() past the EOF, then emit end on the next tick.
-    if (nOrig !== n && state.ended) endReadable(this);
-  }
-
-  if (ret !== null) this.emit('data', ret);
-
-  return ret;
-};
-
-function onEofChunk(stream, state) {
-  if (state.ended) return;
-  if (state.decoder) {
-    var chunk = state.decoder.end();
-    if (chunk && chunk.length) {
-      state.buffer.push(chunk);
-      state.length += state.objectMode ? 1 : chunk.length;
-    }
-  }
-  state.ended = true;
-
-  // emit 'readable' now to make sure it gets picked up.
-  emitReadable(stream);
-}
-
-// Don't emit readable right away in sync mode, because this can trigger
-// another read() call => stack overflow.  This way, it might trigger
-// a nextTick recursion warning, but that's not so bad.
-function emitReadable(stream) {
-  var state = stream._readableState;
-  state.needReadable = false;
-  if (!state.emittedReadable) {
-    debug('emitReadable', state.flowing);
-    state.emittedReadable = true;
-    if (state.sync) pna.nextTick(emitReadable_, stream);else emitReadable_(stream);
-  }
-}
-
-function emitReadable_(stream) {
-  debug('emit readable');
-  stream.emit('readable');
-  flow(stream);
-}
-
-// at this point, the user has presumably seen the 'readable' event,
-// and called read() to consume some data.  that may have triggered
-// in turn another _read(n) call, in which case reading = true if
-// it's in progress.
-// However, if we're not ended, or reading, and the length < hwm,
-// then go ahead and try to read some more preemptively.
-function maybeReadMore(stream, state) {
-  if (!state.readingMore) {
-    state.readingMore = true;
-    pna.nextTick(maybeReadMore_, stream, state);
-  }
-}
-
-function maybeReadMore_(stream, state) {
-  var len = state.length;
-  while (!state.reading && !state.flowing && !state.ended && state.length < state.highWaterMark) {
-    debug('maybeReadMore read 0');
-    stream.read(0);
-    if (len === state.length)
-      // didn't get any data, stop spinning.
-      break;else len = state.length;
-  }
-  state.readingMore = false;
-}
-
-// abstract method.  to be overridden in specific implementation classes.
-// call cb(er, data) where data is <= n in length.
-// for virtual (non-string, non-buffer) streams, "length" is somewhat
-// arbitrary, and perhaps not very meaningful.
-Readable.prototype._read = function (n) {
-  this.emit('error', new Error('_read() is not implemented'));
-};
-
-Readable.prototype.pipe = function (dest, pipeOpts) {
-  var src = this;
-  var state = this._readableState;
-
-  switch (state.pipesCount) {
-    case 0:
-      state.pipes = dest;
-      break;
-    case 1:
-      state.pipes = [state.pipes, dest];
-      break;
-    default:
-      state.pipes.push(dest);
-      break;
-  }
-  state.pipesCount += 1;
-  debug('pipe count=%d opts=%j', state.pipesCount, pipeOpts);
-
-  var doEnd = (!pipeOpts || pipeOpts.end !== false) && dest !== process.stdout && dest !== process.stderr;
-
-  var endFn = doEnd ? onend : unpipe;
-  if (state.endEmitted) pna.nextTick(endFn);else src.once('end', endFn);
-
-  dest.on('unpipe', onunpipe);
-  function onunpipe(readable, unpipeInfo) {
-    debug('onunpipe');
-    if (readable === src) {
-      if (unpipeInfo && unpipeInfo.hasUnpiped === false) {
-        unpipeInfo.hasUnpiped = true;
-        cleanup();
-      }
-    }
-  }
-
-  function onend() {
-    debug('onend');
-    dest.end();
-  }
-
-  // when the dest drains, it reduces the awaitDrain counter
-  // on the source.  This would be more elegant with a .once()
-  // handler in flow(), but adding and removing repeatedly is
-  // too slow.
-  var ondrain = pipeOnDrain(src);
-  dest.on('drain', ondrain);
-
-  var cleanedUp = false;
-  function cleanup() {
-    debug('cleanup');
-    // cleanup event handlers once the pipe is broken
-    dest.removeListener('close', onclose);
-    dest.removeListener('finish', onfinish);
-    dest.removeListener('drain', ondrain);
-    dest.removeListener('error', onerror);
-    dest.removeListener('unpipe', onunpipe);
-    src.removeListener('end', onend);
-    src.removeListener('end', unpipe);
-    src.removeListener('data', ondata);
-
-    cleanedUp = true;
-
-    // if the reader is waiting for a drain event from this
-    // specific writer, then it would cause it to never start
-    // flowing again.
-    // So, if this is awaiting a drain, then we just call it now.
-    // If we don't know, then assume that we are waiting for one.
-    if (state.awaitDrain && (!dest._writableState || dest._writableState.needDrain)) ondrain();
-  }
-
-  // If the user pushes more data while we're writing to dest then we'll end up
-  // in ondata again. However, we only want to increase awaitDrain once because
-  // dest will only emit one 'drain' event for the multiple writes.
-  // => Introduce a guard on increasing awaitDrain.
-  var increasedAwaitDrain = false;
-  src.on('data', ondata);
-  function ondata(chunk) {
-    debug('ondata');
-    increasedAwaitDrain = false;
-    var ret = dest.write(chunk);
-    if (false === ret && !increasedAwaitDrain) {
-      // If the user unpiped during `dest.write()`, it is possible
-      // to get stuck in a permanently paused state if that write
-      // also returned false.
-      // => Check whether `dest` is still a piping destination.
-      if ((state.pipesCount === 1 && state.pipes === dest || state.pipesCount > 1 && indexOf(state.pipes, dest) !== -1) && !cleanedUp) {
-        debug('false write response, pause', src._readableState.awaitDrain);
-        src._readableState.awaitDrain++;
-        increasedAwaitDrain = true;
-      }
-      src.pause();
-    }
-  }
-
-  // if the dest has an error, then stop piping into it.
-  // however, don't suppress the throwing behavior for this.
-  function onerror(er) {
-    debug('onerror', er);
-    unpipe();
-    dest.removeListener('error', onerror);
-    if (EElistenerCount(dest, 'error') === 0) dest.emit('error', er);
-  }
-
-  // Make sure our error handler is attached before userland ones.
-  prependListener(dest, 'error', onerror);
-
-  // Both close and finish should trigger unpipe, but only once.
-  function onclose() {
-    dest.removeListener('finish', onfinish);
-    unpipe();
-  }
-  dest.once('close', onclose);
-  function onfinish() {
-    debug('onfinish');
-    dest.removeListener('close', onclose);
-    unpipe();
-  }
-  dest.once('finish', onfinish);
-
-  function unpipe() {
-    debug('unpipe');
-    src.unpipe(dest);
-  }
-
-  // tell the dest that it's being piped to
-  dest.emit('pipe', src);
-
-  // start the flow if it hasn't been started already.
-  if (!state.flowing) {
-    debug('pipe resume');
-    src.resume();
-  }
-
-  return dest;
-};
-
-function pipeOnDrain(src) {
-  return function () {
-    var state = src._readableState;
-    debug('pipeOnDrain', state.awaitDrain);
-    if (state.awaitDrain) state.awaitDrain--;
-    if (state.awaitDrain === 0 && EElistenerCount(src, 'data')) {
-      state.flowing = true;
-      flow(src);
-    }
-  };
-}
-
-Readable.prototype.unpipe = function (dest) {
-  var state = this._readableState;
-  var unpipeInfo = { hasUnpiped: false };
-
-  // if we're not piping anywhere, then do nothing.
-  if (state.pipesCount === 0) return this;
-
-  // just one destination.  most common case.
-  if (state.pipesCount === 1) {
-    // passed in one, but it's not the right one.
-    if (dest && dest !== state.pipes) return this;
-
-    if (!dest) dest = state.pipes;
-
-    // got a match.
-    state.pipes = null;
-    state.pipesCount = 0;
-    state.flowing = false;
-    if (dest) dest.emit('unpipe', this, unpipeInfo);
-    return this;
-  }
-
-  // slow case. multiple pipe destinations.
-
-  if (!dest) {
-    // remove all.
-    var dests = state.pipes;
-    var len = state.pipesCount;
-    state.pipes = null;
-    state.pipesCount = 0;
-    state.flowing = false;
-
-    for (var i = 0; i < len; i++) {
-      dests[i].emit('unpipe', this, unpipeInfo);
-    }return this;
-  }
-
-  // try to find the right one.
-  var index = indexOf(state.pipes, dest);
-  if (index === -1) return this;
-
-  state.pipes.splice(index, 1);
-  state.pipesCount -= 1;
-  if (state.pipesCount === 1) state.pipes = state.pipes[0];
-
-  dest.emit('unpipe', this, unpipeInfo);
-
-  return this;
-};
-
-// set up data events if they are asked for
-// Ensure readable listeners eventually get something
-Readable.prototype.on = function (ev, fn) {
-  var res = Stream.prototype.on.call(this, ev, fn);
-
-  if (ev === 'data') {
-    // Start flowing on next tick if stream isn't explicitly paused
-    if (this._readableState.flowing !== false) this.resume();
-  } else if (ev === 'readable') {
-    var state = this._readableState;
-    if (!state.endEmitted && !state.readableListening) {
-      state.readableListening = state.needReadable = true;
-      state.emittedReadable = false;
-      if (!state.reading) {
-        pna.nextTick(nReadingNextTick, this);
-      } else if (state.length) {
-        emitReadable(this);
-      }
-    }
-  }
-
-  return res;
-};
-Readable.prototype.addListener = Readable.prototype.on;
-
-function nReadingNextTick(self) {
-  debug('readable nexttick read 0');
-  self.read(0);
-}
-
-// pause() and resume() are remnants of the legacy readable stream API
-// If the user uses them, then switch into old mode.
-Readable.prototype.resume = function () {
-  var state = this._readableState;
-  if (!state.flowing) {
-    debug('resume');
-    state.flowing = true;
-    resume(this, state);
-  }
-  return this;
-};
-
-function resume(stream, state) {
-  if (!state.resumeScheduled) {
-    state.resumeScheduled = true;
-    pna.nextTick(resume_, stream, state);
-  }
-}
-
-function resume_(stream, state) {
-  if (!state.reading) {
-    debug('resume read 0');
-    stream.read(0);
-  }
-
-  state.resumeScheduled = false;
-  state.awaitDrain = 0;
-  stream.emit('resume');
-  flow(stream);
-  if (state.flowing && !state.reading) stream.read(0);
-}
-
-Readable.prototype.pause = function () {
-  debug('call pause flowing=%j', this._readableState.flowing);
-  if (false !== this._readableState.flowing) {
-    debug('pause');
-    this._readableState.flowing = false;
-    this.emit('pause');
-  }
-  return this;
-};
-
-function flow(stream) {
-  var state = stream._readableState;
-  debug('flow', state.flowing);
-  while (state.flowing && stream.read() !== null) {}
-}
-
-// wrap an old-style stream as the async data source.
-// This is *not* part of the readable stream interface.
-// It is an ugly unfortunate mess of history.
-Readable.prototype.wrap = function (stream) {
-  var _this = this;
-
-  var state = this._readableState;
-  var paused = false;
-
-  stream.on('end', function () {
-    debug('wrapped end');
-    if (state.decoder && !state.ended) {
-      var chunk = state.decoder.end();
-      if (chunk && chunk.length) _this.push(chunk);
-    }
-
-    _this.push(null);
-  });
-
-  stream.on('data', function (chunk) {
-    debug('wrapped data');
-    if (state.decoder) chunk = state.decoder.write(chunk);
-
-    // don't skip over falsy values in objectMode
-    if (state.objectMode && (chunk === null || chunk === undefined)) return;else if (!state.objectMode && (!chunk || !chunk.length)) return;
-
-    var ret = _this.push(chunk);
-    if (!ret) {
-      paused = true;
-      stream.pause();
-    }
-  });
-
-  // proxy all the other methods.
-  // important when wrapping filters and duplexes.
-  for (var i in stream) {
-    if (this[i] === undefined && typeof stream[i] === 'function') {
-      this[i] = function (method) {
-        return function () {
-          return stream[method].apply(stream, arguments);
-        };
-      }(i);
-    }
-  }
-
-  // proxy certain important events.
-  for (var n = 0; n < kProxyEvents.length; n++) {
-    stream.on(kProxyEvents[n], this.emit.bind(this, kProxyEvents[n]));
-  }
-
-  // when we try to consume some more bytes, simply unpause the
-  // underlying stream.
-  this._read = function (n) {
-    debug('wrapped _read', n);
-    if (paused) {
-      paused = false;
-      stream.resume();
-    }
-  };
-
-  return this;
-};
-
-Object.defineProperty(Readable.prototype, 'readableHighWaterMark', {
-  // making it explicit this property is not enumerable
-  // because otherwise some prototype manipulation in
-  // userland will fail
-  enumerable: false,
-  get: function () {
-    return this._readableState.highWaterMark;
-  }
-});
-
-// exposed for testing purposes only.
-Readable._fromList = fromList;
-
-// Pluck off n bytes from an array of buffers.
-// Length is the combined lengths of all the buffers in the list.
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function fromList(n, state) {
-  // nothing buffered
-  if (state.length === 0) return null;
-
-  var ret;
-  if (state.objectMode) ret = state.buffer.shift();else if (!n || n >= state.length) {
-    // read it all, truncate the list
-    if (state.decoder) ret = state.buffer.join('');else if (state.buffer.length === 1) ret = state.buffer.head.data;else ret = state.buffer.concat(state.length);
-    state.buffer.clear();
-  } else {
-    // read part of list
-    ret = fromListPartial(n, state.buffer, state.decoder);
-  }
-
-  return ret;
-}
-
-// Extracts only enough buffered data to satisfy the amount requested.
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function fromListPartial(n, list, hasStrings) {
-  var ret;
-  if (n < list.head.data.length) {
-    // slice is the same for buffers and strings
-    ret = list.head.data.slice(0, n);
-    list.head.data = list.head.data.slice(n);
-  } else if (n === list.head.data.length) {
-    // first chunk is a perfect match
-    ret = list.shift();
-  } else {
-    // result spans more than one buffer
-    ret = hasStrings ? copyFromBufferString(n, list) : copyFromBuffer(n, list);
-  }
-  return ret;
-}
-
-// Copies a specified amount of characters from the list of buffered data
-// chunks.
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function copyFromBufferString(n, list) {
-  var p = list.head;
-  var c = 1;
-  var ret = p.data;
-  n -= ret.length;
-  while (p = p.next) {
-    var str = p.data;
-    var nb = n > str.length ? str.length : n;
-    if (nb === str.length) ret += str;else ret += str.slice(0, n);
-    n -= nb;
-    if (n === 0) {
-      if (nb === str.length) {
-        ++c;
-        if (p.next) list.head = p.next;else list.head = list.tail = null;
-      } else {
-        list.head = p;
-        p.data = str.slice(nb);
-      }
-      break;
-    }
-    ++c;
-  }
-  list.length -= c;
-  return ret;
-}
-
-// Copies a specified amount of bytes from the list of buffered data chunks.
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function copyFromBuffer(n, list) {
-  var ret = Buffer.allocUnsafe(n);
-  var p = list.head;
-  var c = 1;
-  p.data.copy(ret);
-  n -= p.data.length;
-  while (p = p.next) {
-    var buf = p.data;
-    var nb = n > buf.length ? buf.length : n;
-    buf.copy(ret, ret.length - n, 0, nb);
-    n -= nb;
-    if (n === 0) {
-      if (nb === buf.length) {
-        ++c;
-        if (p.next) list.head = p.next;else list.head = list.tail = null;
-      } else {
-        list.head = p;
-        p.data = buf.slice(nb);
-      }
-      break;
-    }
-    ++c;
-  }
-  list.length -= c;
-  return ret;
-}
-
-function endReadable(stream) {
-  var state = stream._readableState;
-
-  // If we get here before consuming all the bytes, then that is a
-  // bug in node.  Should never happen.
-  if (state.length > 0) throw new Error('"endReadable()" called on non-empty stream');
-
-  if (!state.endEmitted) {
-    state.ended = true;
-    pna.nextTick(endReadableNT, state, stream);
-  }
-}
-
-function endReadableNT(state, stream) {
-  // Check that we didn't get one last unshift.
-  if (!state.endEmitted && state.length === 0) {
-    state.endEmitted = true;
-    stream.readable = false;
-    stream.emit('end');
-  }
-}
-
-function indexOf(xs, x) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    if (xs[i] === x) return i;
-  }
-  return -1;
-}
-
-/***/ }),
-/* 935 */,
-/* 936 */,
-/* 937 */,
-/* 938 */,
-/* 939 */,
-/* 940 */,
-/* 941 */,
-/* 942 */,
-/* 943 */
+/***/ 943:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -38928,11 +29497,8 @@ module.exports = function xhrAdapter(config) {
 
 
 /***/ }),
-/* 944 */,
-/* 945 */,
-/* 946 */,
-/* 947 */,
-/* 948 */
+
+/***/ 948:
 /***/ (function(module) {
 
 "use strict";
@@ -38981,14 +29547,15 @@ module.exports = function enhanceError(error, config, code, request, response) {
 
 
 /***/ }),
-/* 949 */
+
+/***/ 949:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
 
 
 var compressions = __webpack_require__(703);
-var ZipFileWorker = __webpack_require__(68);
+var ZipFileWorker = __webpack_require__(64);
 
 /**
  * Find the compression to use.
@@ -39045,205 +29612,8 @@ exports.generateWorker = function (zip, options, comment) {
 
 
 /***/ }),
-/* 950 */,
-/* 951 */,
-/* 952 */,
-/* 953 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-const Range = __webpack_require__(174)
-const satisfies = (version, range, options) => {
-  try {
-    range = new Range(range, options)
-  } catch (er) {
-    return false
-  }
-  return range.test(version)
-}
-module.exports = satisfies
-
-
-/***/ }),
-/* 954 */,
-/* 955 */,
-/* 956 */,
-/* 957 */,
-/* 958 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const detectLibc = __webpack_require__(101);
-
-const env = process.env;
-
-module.exports = function () {
-  const arch = env.npm_config_arch || process.arch;
-  const platform = env.npm_config_platform || process.platform;
-  /* istanbul ignore next */
-  const libc = (platform === 'linux' && detectLibc.isNonGlibcLinux) ? detectLibc.family : '';
-
-  const platformId = [`${platform}${libc}`];
-
-  if (arch === 'arm') {
-    const fallback = process.versions.electron ? '7' : '6';
-    platformId.push(`armv${env.npm_config_arm_version || process.config.variables.arm_version || fallback}`);
-  } else if (arch === 'arm64') {
-    platformId.push(`arm64v${env.npm_config_arm_version || '8'}`);
-  } else {
-    platformId.push(arch);
-  }
-
-  return platformId.join('-');
-};
-
-
-/***/ }),
-/* 959 */,
-/* 960 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-const ANY = Symbol('SemVer ANY')
-// hoisted class for cyclic dependency
-class Comparator {
-  static get ANY () {
-    return ANY
-  }
-  constructor (comp, options) {
-    options = parseOptions(options)
-
-    if (comp instanceof Comparator) {
-      if (comp.loose === !!options.loose) {
-        return comp
-      } else {
-        comp = comp.value
-      }
-    }
-
-    debug('comparator', comp, options)
-    this.options = options
-    this.loose = !!options.loose
-    this.parse(comp)
-
-    if (this.semver === ANY) {
-      this.value = ''
-    } else {
-      this.value = this.operator + this.semver.version
-    }
-
-    debug('comp', this)
-  }
-
-  parse (comp) {
-    const r = this.options.loose ? re[t.COMPARATORLOOSE] : re[t.COMPARATOR]
-    const m = comp.match(r)
-
-    if (!m) {
-      throw new TypeError(`Invalid comparator: ${comp}`)
-    }
-
-    this.operator = m[1] !== undefined ? m[1] : ''
-    if (this.operator === '=') {
-      this.operator = ''
-    }
-
-    // if it literally is just '>' or '' then allow anything.
-    if (!m[2]) {
-      this.semver = ANY
-    } else {
-      this.semver = new SemVer(m[2], this.options.loose)
-    }
-  }
-
-  toString () {
-    return this.value
-  }
-
-  test (version) {
-    debug('Comparator.test', version, this.options.loose)
-
-    if (this.semver === ANY || version === ANY) {
-      return true
-    }
-
-    if (typeof version === 'string') {
-      try {
-        version = new SemVer(version, this.options)
-      } catch (er) {
-        return false
-      }
-    }
-
-    return cmp(version, this.operator, this.semver, this.options)
-  }
-
-  intersects (comp, options) {
-    if (!(comp instanceof Comparator)) {
-      throw new TypeError('a Comparator is required')
-    }
-
-    if (!options || typeof options !== 'object') {
-      options = {
-        loose: !!options,
-        includePrerelease: false
-      }
-    }
-
-    if (this.operator === '') {
-      if (this.value === '') {
-        return true
-      }
-      return new Range(comp.value, options).test(this.value)
-    } else if (comp.operator === '') {
-      if (comp.value === '') {
-        return true
-      }
-      return new Range(this.value, options).test(comp.semver)
-    }
-
-    const sameDirectionIncreasing =
-      (this.operator === '>=' || this.operator === '>') &&
-      (comp.operator === '>=' || comp.operator === '>')
-    const sameDirectionDecreasing =
-      (this.operator === '<=' || this.operator === '<') &&
-      (comp.operator === '<=' || comp.operator === '<')
-    const sameSemVer = this.semver.version === comp.semver.version
-    const differentDirectionsInclusive =
-      (this.operator === '>=' || this.operator === '<=') &&
-      (comp.operator === '>=' || comp.operator === '<=')
-    const oppositeDirectionsLessThan =
-      cmp(this.semver, '<', comp.semver, options) &&
-      (this.operator === '>=' || this.operator === '>') &&
-        (comp.operator === '<=' || comp.operator === '<')
-    const oppositeDirectionsGreaterThan =
-      cmp(this.semver, '>', comp.semver, options) &&
-      (this.operator === '<=' || this.operator === '<') &&
-        (comp.operator === '>=' || comp.operator === '>')
-
-    return (
-      sameDirectionIncreasing ||
-      sameDirectionDecreasing ||
-      (sameSemVer && differentDirectionsInclusive) ||
-      oppositeDirectionsLessThan ||
-      oppositeDirectionsGreaterThan
-    )
-  }
-}
-
-module.exports = Comparator
-
-const parseOptions = __webpack_require__(849)
-const {re, t} = __webpack_require__(609)
-const cmp = __webpack_require__(425)
-const debug = __webpack_require__(39)
-const SemVer = __webpack_require__(82)
-const Range = __webpack_require__(174)
-
-
-/***/ }),
-/* 961 */,
-/* 962 */
+/***/ 962:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
@@ -39256,72 +29626,8 @@ module.exports = {
 
 
 /***/ }),
-/* 963 */,
-/* 964 */,
-/* 965 */,
-/* 966 */,
-/* 967 */,
-/* 968 */,
-/* 969 */,
-/* 970 */,
-/* 971 */,
-/* 972 */,
-/* 973 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
 
-// just pre-load all the stuff that index.js lazily exports
-const internalRe = __webpack_require__(609)
-module.exports = {
-  re: internalRe.re,
-  src: internalRe.src,
-  tokens: internalRe.t,
-  SEMVER_SPEC_VERSION: __webpack_require__(248).SEMVER_SPEC_VERSION,
-  SemVer: __webpack_require__(82),
-  compareIdentifiers: __webpack_require__(610).compareIdentifiers,
-  rcompareIdentifiers: __webpack_require__(610).rcompareIdentifiers,
-  parse: __webpack_require__(621),
-  valid: __webpack_require__(472),
-  clean: __webpack_require__(131),
-  inc: __webpack_require__(138),
-  diff: __webpack_require__(546),
-  major: __webpack_require__(627),
-  minor: __webpack_require__(876),
-  patch: __webpack_require__(921),
-  prerelease: __webpack_require__(624),
-  compare: __webpack_require__(233),
-  rcompare: __webpack_require__(388),
-  compareLoose: __webpack_require__(786),
-  compareBuild: __webpack_require__(185),
-  sort: __webpack_require__(152),
-  rsort: __webpack_require__(655),
-  gt: __webpack_require__(180),
-  lt: __webpack_require__(25),
-  eq: __webpack_require__(12),
-  neq: __webpack_require__(796),
-  gte: __webpack_require__(140),
-  lte: __webpack_require__(125),
-  cmp: __webpack_require__(425),
-  coerce: __webpack_require__(826),
-  Comparator: __webpack_require__(960),
-  Range: __webpack_require__(174),
-  satisfies: __webpack_require__(953),
-  toComparators: __webpack_require__(500),
-  maxSatisfying: __webpack_require__(434),
-  minSatisfying: __webpack_require__(156),
-  minVersion: __webpack_require__(845),
-  validRange: __webpack_require__(572),
-  outside: __webpack_require__(404),
-  gtr: __webpack_require__(873),
-  ltr: __webpack_require__(900),
-  intersects: __webpack_require__(482),
-  simplifyRange: __webpack_require__(999),
-  subset: __webpack_require__(887),
-}
-
-
-/***/ }),
-/* 974 */,
-/* 975 */
+/***/ 975:
 /***/ (function(module) {
 
 "use strict";
@@ -39401,15 +29707,8 @@ function immediate(task) {
 
 
 /***/ }),
-/* 976 */,
-/* 977 */,
-/* 978 */,
-/* 979 */,
-/* 980 */,
-/* 981 */,
-/* 982 */,
-/* 983 */,
-/* 984 */
+
+/***/ 984:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var fs = __webpack_require__(747);
@@ -39531,22 +29830,15 @@ function zipBuffer (rootDir, options, callback) {
 
 
 /***/ }),
-/* 985 */,
-/* 986 */,
-/* 987 */,
-/* 988 */,
-/* 989 */,
-/* 990 */,
-/* 991 */,
-/* 992 */,
-/* 993 */
+
+/***/ 993:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 const path = __webpack_require__(622)
 const fs = __webpack_require__(747)
 const fse = __webpack_require__(776)
 const rimraf = __webpack_require__(335)
-const sharp = __webpack_require__(189)
+// const sharp = require('sharp')
 const zipDir = __webpack_require__(984)
 const dotize = __webpack_require__(422)
 const { default: axios } = __webpack_require__(366)
@@ -39631,9 +29923,9 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
       copySync(sourceFile, `${distWidgetImagesFolder}/${imageFile[0]}`)
     }
     // либо генерим (если указан логотип-исходник)
-    else if (logotypeContent) {
-      await createLogo(logotypeContent, `${distWidgetImagesFolder}/${imageFile[0]}`, imageFile[1], imageFile[2])
-    }
+    // else if (logotypeContent) {
+    //   await createLogo(logotypeContent, `${distWidgetImagesFolder}/${imageFile[0]}`, imageFile[1], imageFile[2])
+    // }
   }
 
   // создаем манифест из оптсов
@@ -39701,50 +29993,48 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
   }
 }
 
-const createLogo = async (logo, target, width, height, background = `#000000`) => {
-  const maxLogoWidth = 0.8
-  const maxLogoHeight = 0.8
+// const createLogo = async (logo, target, width, height, background = `#000000`) => {
+//   const maxLogoWidth = 0.8
+//   const maxLogoHeight = 0.8
 
-  const logoFile = sharp(logo)
-  const logoMeta = await logoFile.metadata()
+//   const logoFile = sharp(logo)
+//   const logoMeta = await logoFile.metadata()
 
-  logoFile.resize({
-    width: Math.round(Math.min(logoMeta.width, width * maxLogoWidth)),
-    height: Math.round(Math.min(logoMeta.height, height * maxLogoHeight)),
-    fit: sharp.fit.inside,
-    withoutEnlargement: true
-  })
+//   logoFile.resize({
+//     width: Math.round(Math.min(logoMeta.width, width * maxLogoWidth)),
+//     height: Math.round(Math.min(logoMeta.height, height * maxLogoHeight)),
+//     fit: sharp.fit.inside,
+//     withoutEnlargement: true
+//   })
 
-  const img = sharp({
-    create: {
-      width,
-      height,
-      channels: 4,
-      background
-    }
-  }).png()
+//   const img = sharp({
+//     create: {
+//       width,
+//       height,
+//       channels: 4,
+//       background
+//     }
+//   }).png()
 
-  img.composite([
-    {
-      input: await logoFile.toBuffer(),
-      gravity: 'centre',
-      tile: false
-    }
-  ])
+//   img.composite([
+//     {
+//       input: await logoFile.toBuffer(),
+//       gravity: 'centre',
+//       tile: false
+//     }
+//   ])
 
-  await img.toFile(target)
+//   await img.toFile(target)
 
-  return true
-}
+//   return true
+// }
 
 module.exports = generateWidget
 
 
 /***/ }),
-/* 994 */,
-/* 995 */,
-/* 996 */,
-/* 997 */
+
+/***/ 997:
 /***/ (function(module) {
 
 "use strict";
@@ -39773,82 +30063,6 @@ function clone (obj) {
 }
 
 
-/***/ }),
-/* 998 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-var utils = __webpack_require__(318);
-
-/**
- * Transform the data for a request or a response
- *
- * @param {Object|String} data The data to be transformed
- * @param {Array} headers The headers for the request or response
- * @param {Array|Function} fns A single function or Array of functions
- * @returns {*} The resulting transformed data
- */
-module.exports = function transformData(data, headers, fns) {
-  /*eslint no-param-reassign:0*/
-  utils.forEach(fns, function transform(fn) {
-    data = fn(data, headers);
-  });
-
-  return data;
-};
-
-
-/***/ }),
-/* 999 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-// given a set of versions and a range, create a "simplified" range
-// that includes the same versions that the original range does
-// If the original range is shorter than the simplified one, return that.
-const satisfies = __webpack_require__(953)
-const compare = __webpack_require__(233)
-module.exports = (versions, range, options) => {
-  const set = []
-  let min = null
-  let prev = null
-  const v = versions.sort((a, b) => compare(a, b, options))
-  for (const version of v) {
-    const included = satisfies(version, range, options)
-    if (included) {
-      prev = version
-      if (!min)
-        min = version
-    } else {
-      if (prev) {
-        set.push([min, prev])
-      }
-      prev = null
-      min = null
-    }
-  }
-  if (min)
-    set.push([min, null])
-
-  const ranges = []
-  for (const [min, max] of set) {
-    if (min === max)
-      ranges.push(min)
-    else if (!max && min === v[0])
-      ranges.push('*')
-    else if (!max)
-      ranges.push(`>=${min}`)
-    else if (min === v[0])
-      ranges.push(`<=${max}`)
-    else
-      ranges.push(`${min} - ${max}`)
-  }
-  const simplified = ranges.join(' || ')
-  const original = typeof range.raw === 'string' ? range.raw : String(range)
-  return simplified.length < original.length ? simplified : range
-}
-
-
 /***/ })
-/******/ ]);
+
+/******/ });

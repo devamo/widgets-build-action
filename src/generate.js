@@ -2,7 +2,7 @@ const path = require('path')
 const fs = require('fs')
 const fse = require('fs-extra')
 const rimraf = require('rimraf')
-const sharp = require('sharp')
+// const sharp = require('sharp')
 const zipDir = require('zip-dir')
 const dotize = require('./dotize.js')
 const { default: axios } = require('axios')
@@ -87,9 +87,9 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
       copySync(sourceFile, `${distWidgetImagesFolder}/${imageFile[0]}`)
     }
     // либо генерим (если указан логотип-исходник)
-    else if (logotypeContent) {
-      await createLogo(logotypeContent, `${distWidgetImagesFolder}/${imageFile[0]}`, imageFile[1], imageFile[2])
-    }
+    // else if (logotypeContent) {
+    //   await createLogo(logotypeContent, `${distWidgetImagesFolder}/${imageFile[0]}`, imageFile[1], imageFile[2])
+    // }
   }
 
   // создаем манифест из оптсов
@@ -157,40 +157,40 @@ const generateWidget = async (builderFolder, sourcesFolder, distFolder, outputFo
   }
 }
 
-const createLogo = async (logo, target, width, height, background = `#000000`) => {
-  const maxLogoWidth = 0.8
-  const maxLogoHeight = 0.8
+// const createLogo = async (logo, target, width, height, background = `#000000`) => {
+//   const maxLogoWidth = 0.8
+//   const maxLogoHeight = 0.8
 
-  const logoFile = sharp(logo)
-  const logoMeta = await logoFile.metadata()
+//   const logoFile = sharp(logo)
+//   const logoMeta = await logoFile.metadata()
 
-  logoFile.resize({
-    width: Math.round(Math.min(logoMeta.width, width * maxLogoWidth)),
-    height: Math.round(Math.min(logoMeta.height, height * maxLogoHeight)),
-    fit: sharp.fit.inside,
-    withoutEnlargement: true
-  })
+//   logoFile.resize({
+//     width: Math.round(Math.min(logoMeta.width, width * maxLogoWidth)),
+//     height: Math.round(Math.min(logoMeta.height, height * maxLogoHeight)),
+//     fit: sharp.fit.inside,
+//     withoutEnlargement: true
+//   })
 
-  const img = sharp({
-    create: {
-      width,
-      height,
-      channels: 4,
-      background
-    }
-  }).png()
+//   const img = sharp({
+//     create: {
+//       width,
+//       height,
+//       channels: 4,
+//       background
+//     }
+//   }).png()
 
-  img.composite([
-    {
-      input: await logoFile.toBuffer(),
-      gravity: 'centre',
-      tile: false
-    }
-  ])
+//   img.composite([
+//     {
+//       input: await logoFile.toBuffer(),
+//       gravity: 'centre',
+//       tile: false
+//     }
+//   ])
 
-  await img.toFile(target)
+//   await img.toFile(target)
 
-  return true
-}
+//   return true
+// }
 
 module.exports = generateWidget
