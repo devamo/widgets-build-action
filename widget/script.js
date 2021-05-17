@@ -1,14 +1,10 @@
-window['{{product.alias}}-version'] =
-  localStorage['{{product.alias}}-version'] || '{{productVersion.version}}' || '1.0'
+window['{{product.alias}}-version'] = localStorage['{{product.alias}}-version'] || '{{productVersion.version}}' || '1.0'
 
 window['{{product.alias}}-bundle'] = localStorage['{{product.alias}}-bundle']
   ? localStorage['{{product.alias}}-bundle']
-  : '{{productVersion.prodBundleUrl}}' ||
-    'https://w.devio.pro/static/{{product.alias}}/build/bundle.js'
+  : '{{productVersion.prodBundleUrl}}'
 
-define([`${window['{{product.alias}}-bundle']}?v=${window['{{product.alias}}-version']}`], (
-  Widget
-) => {
+define([`${window['{{product.alias}}-bundle']}?v=${window['{{product.alias}}-version']}`], Widget => {
   return function () {
     try {
       const widget = new Widget({
